@@ -53,6 +53,11 @@ server/uploads/
 # AI assistant files
 .claude/
 .cursor/
+.cursorrules
+
+# Project management files
+todo.md
+inworld-runtime-feedback.md
 
 # Demo and temporary files
 server/provider-error-demo.js
