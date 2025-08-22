@@ -20,6 +20,17 @@ const configSchema = z.object({
     apiKey: z.string(),
     baseUrl: z.string()
   }),
+  flux: z.object({
+    apiKey: z.string(),
+    baseUrl: z.string().default('https://api.fluxapi.ai'),
+    defaultModel: z.string().default('flux-1-dev'),
+    useMock: z.boolean().default(true) // Use mock by default to save API credits
+  }),
+  images: z.object({
+    storagePath: z.string().default('./storage/images'),
+    maxSize: z.string().default('10MB'),
+    thumbnailSize: z.number().default(300)
+  }),
   logging: z.object({
     level: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
     filePath: z.string().default('./logs/app.log')
@@ -51,6 +62,17 @@ const parseConfig = () => {
       imageEdit: {
         apiKey: process.env.IMAGE_EDIT_API_KEY || '',
         baseUrl: process.env.IMAGE_EDIT_BASE_URL || ''
+      },
+      flux: {
+        apiKey: process.env.FLUX_API_KEY || '',
+        baseUrl: process.env.FLUX_API_BASE_URL || 'https://api.fluxapi.ai',
+        defaultModel: process.env.FLUX_DEFAULT_MODEL || 'flux-1-dev',
+        useMock: process.env.FLUX_USE_MOCK !== 'false' // Default to mock unless explicitly set to false
+      },
+      images: {
+        storagePath: process.env.IMAGE_STORAGE_PATH || './storage/images',
+        maxSize: process.env.IMAGE_MAX_SIZE || '10MB',
+        thumbnailSize: Number(process.env.IMAGE_THUMBNAIL_SIZE) || 300
       },
       logging: {
         level: (process.env.LOG_LEVEL as 'error' | 'warn' | 'info' | 'debug') || 'info',
