@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RetroChat x64 - Inworld Runtime</title>
+    <link rel="stylesheet" href="arcade-styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap" rel="stylesheet">
+</head>
+<body style="background: #ff0080 !important; background-image: radial-gradient(circle at 20px 20px, #00ffff 4px, transparent 4px), linear-gradient(45deg, #1a0066, #660066, #006666, #660033) !important;">
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="pixel-icon">🎮</div>
+                    <span>RetroChat x64</span>
+                </div>
+                <div class="status-indicators">
+                    <div class="status-indicator" id="connectionStatus">
+                        <div class="pixel-dot active"></div>
+                        <span>ONLINE</span>
+                    </div>
+                    <div class="session-info" id="sessionInfo">
+                        <div class="pixel-icon">👤</div>
+                        <span>PLAYER: GUEST</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Chat Container -->
+        <main class="chat-container">
+            <!-- Chat Messages -->
+            <div class="messages-container" id="messagesContainer">
+                <div class="welcome-message">
+                    <div class="retro-frame">
+                        <div class="welcome-icon">
+                            🤖
+                        </div>
+                        <div class="dialog-box">
+                            <h2>► Welcome, Player!</h2>
+                            <p>I'm your AI assistant! Choose your action:</p>
+                            <div class="suggestions">
+                                <button class="retro-btn primary" onclick="sendSuggestion('Generate a beautiful cyberpunk cityscape')">
+                                    <span class="btn-icon">🖼️</span> CREATE IMAGE
+                                </button>
+                                <button class="retro-btn secondary" onclick="sendSuggestion('Hello there! How are you today?')">
+                                    <span class="btn-icon">💬</span> START CHAT
+                                </button>
+                                <button class="retro-btn tertiary" onclick="sendSuggestion('Draw a mystical wizard casting spells')">
+                                    <span class="btn-icon">✨</span> MAKE ART
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                <div class="retro-dialog">
+                    <div class="pixel-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <span class="typing-text">► AI is thinking...</span>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <div class="gameboy-input">
+                    <div class="input-frame">
+                        <textarea
+                            id="messageInput"
+                            placeholder="► Enter command..."
+                            rows="1"
+                            autocomplete="off"
+                        ></textarea>
+                        <div class="input-controls">
+                            <button class="pixel-btn action" id="imageUploadBtn" title="Item Bag (Coming Soon)" disabled>
+                                🎒
+                            </button>
+                            <button class="pixel-btn send" id="sendBtn" disabled>
+                                ▶️
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="quick-actions" id="quickActions" style="display: none;">
+                    <button class="retro-quick-btn" onclick="sendSuggestion('Generate another image')">
+                        🔄 RETRY
+                    </button>
+                    <button class="retro-quick-btn" onclick="sendSuggestion('Tell me about the last image')">
+                        ℹ️ INFO
+                    </button>
+                    <button class="retro-quick-btn" onclick="clearChat()">
+                        🗑️ CLEAR
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Sidebar (Session Info) -->
+        <aside class="sidebar" id="sidebar">
+            <div class="retro-sidebar">
+                <div class="sidebar-header">
+                    <h3>📊 PLAYER STATS</h3>
+                    <button class="close-sidebar" onclick="toggleSidebar()">
+                        ❌
+                    </button>
+                </div>
+                <div class="sidebar-content">
+                    <div class="sidebar-section">
+                        <div class="stat-card">
+                            <div class="stat-icon">💬</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="messageCount">0</span>
+                                <span class="stat-label">MESSAGES</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🖼️</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="imageCount">0</span>
+                                <span class="stat-label">IMAGES</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏰</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="sessionDuration">0m</span>
+                                <span class="stat-label">TIME</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-section intents-section">
+                        <h4>► ACTIONS USED</h4>
+                        <div class="intents-list" id="intentsList">
+                            <span class="no-data">No actions yet...</span>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-section images-section">
+                        <h4>► IMAGE GALLERY</h4>
+                        <div class="images-grid" id="imagesGrid">
+                            <span class="no-data">No images yet...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Toggle Sidebar Button -->
+        <button class="toggle-sidebar" onclick="toggleSidebar()">
+            📊
+        </button>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+            <div class="retro-loading">
+                <div class="arcade-spinner">
+                    <div class="spinner-circle">
+                        <div class="spinner-segment"></div>
+                        <div class="spinner-segment"></div>
+                        <div class="spinner-segment"></div>
+                        <div class="spinner-segment"></div>
+                    </div>
+                </div>
+                <div class="loading-text">
+                    <p>► GENERATING IMAGE...</p>
+                    <small>Please wait 10-30 seconds</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
