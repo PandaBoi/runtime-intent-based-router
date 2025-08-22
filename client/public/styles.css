@@ -524,6 +524,66 @@ body::before {
     max-width: 200px;
 }
 
+.typing-bubble {
+    background: var(--pixel-white);
+    color: var(--pixel-black);
+    border: 3px solid var(--pixel-black);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--primary-font);
+    font-size: 16px;
+    text-transform: uppercase;
+    border-radius: 0;
+    box-shadow: 2px 2px 0px var(--pixel-gray);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        background: var(--pixel-white);
+    }
+    50% {
+        transform: scale(1.1);
+        background: var(--gb-lightest-green);
+    }
+}
+
+.bounce-dots {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 30px;
+}
+
+.bounce-dots span {
+    width: 8px;
+    height: 8px;
+    margin: 0 3px;
+    background-color: var(--pixel-black);
+    border-radius: 50%;
+    animation: bounce 1.5s infinite ease-in-out;
+}
+
+.bounce-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.bounce-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes bounce {
+    0%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+}
+
 .retro-dialog {
     background: var(--assistant-bg);
     color: var(--pixel-black);
@@ -829,14 +889,12 @@ body::before {
 
 .images-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    grid-template-columns: repeat(auto-fill, 80px);
     gap: 8px;
 }
 
 .thumbnail {
     width: 100%;
-    max-width: 80px;
-    max-height: 80px;
     aspect-ratio: 1;
     object-fit: cover;
     border: 2px solid var(--pixel-white);

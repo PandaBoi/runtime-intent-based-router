@@ -127,17 +127,8 @@ class ChatApp {
                 this.toggleSendButton()
             }
 
-            this.addUserMessage(message)
-
-            // Pre-detect if this might be an image request based on keywords
-            const isLikelyImageRequest = this.detectImageRequest(message)
-
-            if (isLikelyImageRequest) {
-                this.showTypingIndicator('Art in progress...')
-                console.log('🖼️ Pre-detected image request, showing art progress indicator')
-            } else {
-                this.showTypingIndicator() // Start with default text
-            }
+                        this.addUserMessage(message)
+            this.showTypingIndicator() // Always start with default text
 
             // Disable input during processing
             this.setInputEnabled(false)
@@ -196,20 +187,7 @@ class ChatApp {
         }
     }
 
-    detectImageRequest(message) {
-        const lowerMessage = message.toLowerCase()
 
-        // Simple and reliable image detection
-        return lowerMessage.includes('generate') ||
-               lowerMessage.includes('create') ||
-               lowerMessage.includes('image') ||
-               lowerMessage.includes('picture') ||
-               lowerMessage.includes('photo') ||
-               lowerMessage.includes('draw') ||
-               lowerMessage.includes('paint') ||
-               lowerMessage.includes('edit') ||
-               lowerMessage.includes('modify')
-    }
 
 
 
@@ -334,18 +312,69 @@ class ChatApp {
         this.scrollToBottom()
     }
 
-    showTypingIndicator(customText = null) {
-        if (customText) {
-            this.typingIndicator.innerHTML = `<div class="typing-bubble">► ${customText}</div>`
-        } else {
-            this.typingIndicator.innerHTML = '<div class="typing-bubble">► AI is thinking...</div>'
-        }
+                                showTypingIndicator(customText = null) {
+        if (!this.typingIndicator) return
+
+        this.typingIndicator.innerHTML = '<div class="typing-bubble" id="typingBubble"><span id="dot1">●</span> <span id="dot2">●</span> <span id="dot3">●</span></div>'
         this.typingIndicator.style.display = 'flex'
         this.scrollToBottom()
+
+        // Wait for DOM to update, then start animation
+        setTimeout(() => {
+            this.startTypingAnimation()
+        }, 50)
+    }
+
+                    startTypingAnimation() {
+        const dot1 = document.getElementById('dot1')
+        const dot2 = document.getElementById('dot2')
+        const dot3 = document.getElementById('dot3')
+
+        console.log('Dots found:', dot1, dot2, dot3)
+
+        if (!dot1 || !dot2 || !dot3) {
+            console.error('Could not find dot elements')
+            return
+        }
+
+        let step = 0
+
+                        // Add smooth transitions to dots
+        dot1.style.position = 'relative'
+        dot1.style.transition = 'top 0.15s ease-in-out'
+        dot2.style.position = 'relative'
+        dot2.style.transition = 'top 0.15s ease-in-out'
+        dot3.style.position = 'relative'
+        dot3.style.transition = 'top 0.15s ease-in-out'
+
+        this.typingAnimationInterval = setInterval(() => {
+            // Reset all dots
+            dot1.style.top = '0px'
+            dot2.style.top = '0px'
+            dot3.style.top = '0px'
+
+            // Bounce one dot at a time
+            const activeCase = step % 3
+            if (activeCase === 0) {
+                dot1.style.top = '-12px'
+            } else if (activeCase === 1) {
+                dot2.style.top = '-12px'
+            } else {
+                dot3.style.top = '-12px'
+            }
+
+            step++
+        }, 200)
     }
 
     hideTypingIndicator() {
         this.typingIndicator.style.display = 'none'
+
+        // Stop the animation
+        if (this.typingAnimationInterval) {
+            clearInterval(this.typingAnimationInterval)
+            this.typingAnimationInterval = null
+        }
     }
 
     showLoadingOverlay(show) {
@@ -443,6 +472,8 @@ class ChatApp {
     }
 
     updateIntentsList() {
+        if (!this.intentsList) return
+
         if (this.intents.size === 0) {
             this.intentsList.innerHTML = '<span class="no-data">No actions yet...</span>'
             return
@@ -462,6 +493,8 @@ class ChatApp {
     }
 
     updateImagesGrid(imageUrl, prompt) {
+        if (!this.imagesGrid) return
+
         if (this.imageCount === 1) {
             // First image, clear the "no data" message
             this.imagesGrid.innerHTML = ''
