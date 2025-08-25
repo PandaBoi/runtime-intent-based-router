@@ -72,7 +72,7 @@ cd ../client && npm install
 
 # Configure environment
 cd server
-cp env.example.complete .env
+cp env.example .env
 # Edit .env: Set INWORLD_API_KEY=your_key_here
 
 # Start application
@@ -109,7 +109,7 @@ FLUX_USE_MOCK=true  # Keep true for development (no API costs)
 OPENAI_API_KEY=sk-...
 ```
 
-See [env.example.complete](env.example.complete) for all configuration options.
+See [env.example](env.example) for all configuration options.
 
 ## Testing
 
@@ -161,7 +161,7 @@ npm run test:coverage
 ├── client/                   # Frontend
 │   ├── public/
 │   └── package.json
-└── env.example.complete      # Configuration template
+└── env.example      # Configuration template
 ```
 
 ## Troubleshooting
