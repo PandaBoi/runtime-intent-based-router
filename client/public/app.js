@@ -35,6 +35,10 @@ class ChatApp {
 
         // Quick actions
         this.quickActions = document.getElementById('quickActions')
+
+        // Image upload elements
+        this.imageUploadBtn = document.getElementById('imageUploadBtn')
+        this.imageUploadInput = document.getElementById('imageUploadInput')
     }
 
     setupEventListeners() {
@@ -46,6 +50,17 @@ class ChatApp {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
                 this.sendMessage()
+            }
+        })
+
+        // Image upload functionality
+        this.imageUploadBtn.addEventListener('click', () => {
+            this.imageUploadInput.click()
+        })
+
+        this.imageUploadInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                this.uploadImage(e.target.files[0])
             }
         })
 
@@ -201,15 +216,23 @@ class ChatApp {
         const message = data.message
         const intent = data.detectedIntent
 
-        // Create message element
-        const messageEl = this.createMessageElement('assistant', message.content, intent)
+        console.log('📨 Assistant message received:', {
+            content: message.content.substring(0, 100),
+            intent,
+            fullData: data
+        })
 
-        // Check if this is an image generation response
-        if (intent === 'generate-image' && message.content.includes('Image Generated')) {
-            this.handleImageGenerationResponse(messageEl, message.content)
+        // Check if this is an image response (URL + optional suggestions)
+        if (this.isImageResponse(message.content, intent)) {
+            console.log('✅ Detected as image response, rendering image')
+            this.handleImageResponse(message.content, intent)
+        } else {
+            console.log('📝 Detected as text response, rendering text')
+            // Create regular message element
+            const messageEl = this.createMessageElement('assistant', message.content, intent)
+            this.appendMessage(messageEl)
         }
 
-        this.appendMessage(messageEl)
         this.messageCount++
 
         // Track intent
@@ -219,46 +242,67 @@ class ChatApp {
         }
     }
 
-    handleImageGenerationResponse(messageEl, content) {
+        isImageResponse(content, intent) {
+        // Check if content contains an image URL (more flexible detection)
+        const hasImageUrl = /https?:\/\/[^\s\n]+/i.test(content.split('\n')[0])
+
+        // Check if intent suggests this is an image response (case-insensitive and flexible)
+        const intentStr = (intent || '').toLowerCase().replace(/[-_]/g, '')
+        const isImageIntent = intentStr.includes('generateimage') ||
+                             intentStr.includes('editimage') ||
+                             intentStr.includes('image')
+
+        console.log('🔍 Image detection:', { content: content.substring(0, 100), intent, hasImageUrl, isImageIntent })
+
+        return hasImageUrl && isImageIntent
+    }
+
+    handleImageResponse(content, intent) {
         console.log('🖼️ Processing image response:', content)
 
-        // Extract image URL from the response content
-        const urlMatch = content.match(/📸 \*\*Image URL\*\*: (https?:\/\/[^\s\n]+)/)
-        const enhancedPromptMatch = content.match(/🎯 \*\*Enhanced Prompt\*\*: ([^\n]+)/)
-        const timeMatch = content.match(/⏱️ \*\*Generation Time\*\*: (\d+)ms/)
+        // Split content by lines to get URL and suggestions
+        const lines = content.split('\n').filter(line => line.trim())
+        const imageUrl = lines[0].trim()
+        const suggestions = lines.slice(1).join(' ').trim()
 
-        console.log('🔍 URL match:', urlMatch)
-        console.log('🔍 Enhanced prompt match:', enhancedPromptMatch)
-        console.log('🔍 Time match:', timeMatch)
+        console.log('✅ Extracted image URL:', imageUrl)
+        console.log('💡 Suggestions:', suggestions)
 
-        if (urlMatch) {
-            const imageUrl = urlMatch[1]
-            const enhancedPrompt = enhancedPromptMatch ? enhancedPromptMatch[1] : 'Generated image'
-            const generationTime = timeMatch ? timeMatch[1] : 'Unknown'
+        // Create message element with image
+        const messageEl = this.createImageMessageElement(imageUrl, suggestions, intent)
+        this.appendMessage(messageEl)
 
-            console.log('✅ Extracted image URL:', imageUrl)
+        this.imageCount++
+        this.updateImagesGrid(imageUrl, intent === 'generate-image' ? 'Generated image' : 'Edited image')
 
-            // Add image to message
-            const imageContainer = document.createElement('div')
-            imageContainer.className = 'image-message'
-            imageContainer.innerHTML = `
-                <div class="image-container">
-                    <img src="${imageUrl}" alt="Generated image" class="generated-image" onclick="openImageModal('${imageUrl}')">
+        // Hide typing indicator and re-enable input when image is ready
+        this.hideTypingIndicator()
+        this.setInputEnabled(true)
+    }
+
+    createImageMessageElement(imageUrl, suggestions, intent) {
+        const messageEl = document.createElement('div')
+        messageEl.className = 'message assistant'
+
+        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        const intentBadge = intent ? `<span class="intent-badge">${intent}</span>` : ''
+
+        messageEl.innerHTML = `
+            <div class="message-content">
+                <div class="message-header">
+                    <span class="timestamp">${timestamp}</span>
+                    ${intentBadge}
                 </div>
-                <div class="image-info">
-                    <strong>Enhanced Prompt:</strong> ${enhancedPrompt}<br>
-                    <div class="generation-time">Generated in ${generationTime}ms</div>
+                                <div class="image-message">
+                    <div class="image-container">
+                        <img src="${imageUrl}" alt="AI generated image" class="generated-image" onclick="openImageModal('${imageUrl}')">
+                    </div>
+                    ${suggestions ? `<div class="image-suggestions">${this.formatMessage(suggestions)}</div>` : ''}
                 </div>
-            `
+            </div>
+        `
 
-            messageEl.querySelector('.message-content').appendChild(imageContainer)
-            this.imageCount++
-            this.updateImagesGrid(imageUrl, enhancedPrompt)
-
-            // Hide typing indicator and re-enable input when image is ready
-            this.hideTypingIndicator()
-            this.setInputEnabled(true)
-        }
+        return messageEl
     }
 
     addErrorMessage(message) {
@@ -516,6 +560,74 @@ class ChatApp {
     showError(message) {
         // You could implement a toast notification here
         console.error(message)
+    }
+
+    async uploadImage(file) {
+        try {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                this.addMessage('system', 'Please upload a valid image file (JPEG, PNG, WebP, etc.)')
+                return
+            }
+
+            // Validate file size (10MB limit)
+            const maxSize = 10 * 1024 * 1024 // 10MB
+            if (file.size > maxSize) {
+                this.addMessage('system', 'Image file is too large. Maximum size is 10MB.')
+                return
+            }
+
+            // Show upload indicator
+            this.showTypingIndicator()
+            this.addMessage('user', `📁 Uploading image: ${file.name}`)
+
+            // Create session if needed
+            if (!this.sessionId) {
+                await this.createSession()
+            }
+
+            // Create form data
+            const formData = new FormData()
+            formData.append('image', file)
+            formData.append('sessionId', this.sessionId)
+
+            // Upload image
+            const response = await fetch(`${this.API_BASE}/images/upload`, {
+                method: 'POST',
+                body: formData
+            })
+
+            const result = await response.json()
+
+            this.hideTypingIndicator()
+
+            if (result.success) {
+                // Add success message with image
+                const imageUrl = result.data.image.storageUrl
+                const successMessage = `📷 Image uploaded successfully!\n\n${imageUrl}\n\n${result.data.message || 'You can now edit this image by saying things like "make it brighter" or "add a gothic style".'}`
+
+                this.addMessage('assistant', successMessage)
+
+                // Update image count and refresh images
+                this.imageCount++
+                this.updateStats()
+                this.fetchSessionImages()
+
+                // Clear the file input
+                this.imageUploadInput.value = ''
+
+            } else {
+                this.addMessage('system', `Upload failed: ${result.error}`)
+            }
+
+        } catch (error) {
+            this.hideTypingIndicator()
+            console.error('Image upload error:', error)
+            this.addMessage('system', 'Failed to upload image. Please try again.')
+
+            // Clear the file input
+            this.imageUploadInput.value = ''
+        }
     }
 }
 

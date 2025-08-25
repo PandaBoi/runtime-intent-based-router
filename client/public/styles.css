@@ -1164,3 +1164,61 @@ body::before {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
 }
+
+/* ===============================
+   IMAGE DISPLAY STYLES
+   =============================== */
+
+.image-message {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.image-container {
+    position: relative;
+    max-width: 100%;
+    border: 2px solid var(--pixel-black);
+    background: var(--pixel-white);
+    padding: 4px;
+    border-radius: 0;
+}
+
+.generated-image {
+    width: 100%;
+    max-width: 400px;
+    height: auto;
+    display: block;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.generated-image:hover {
+    transform: scale(1.02);
+    filter: brightness(1.1);
+}
+
+.image-suggestions {
+    background: var(--gb-dark-green);
+    color: var(--gb-lightest-green);
+    padding: 8px;
+    border: 2px solid var(--gb-lightest-green);
+    font-family: var(--primary-font);
+    font-size: 8px;
+    line-height: 1.4;
+}
+
+.error-message {
+    background: var(--retro-red);
+    color: white;
+    padding: 12px;
+    text-align: center;
+    font-family: var(--primary-font);
+    font-size: 8px;
+    border: 2px solid var(--pixel-white);
+}

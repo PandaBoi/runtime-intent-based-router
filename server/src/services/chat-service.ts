@@ -90,12 +90,12 @@ export class ChatService {
 
           if (imageResult.success && imageResult.data?.imageMetadata) {
             const imageData = imageResult.data
-            responseText = `**Image Generated Successfully!**\n\n` +
-              `**Image URL**: ${imageData.imageMetadata!.storageUrl}\n` +
-              `**Enhanced Prompt**: ${imageData.enhancedPrompt}\n` +
-              `**Generation Time**: ${imageData.generationTime}ms\n` +
-              `**Suggestions**: ${imageData.suggestions?.join(', ')}\n\n` +
-              `Your image has been added to this session!`
+            responseText = `${imageData.imageMetadata!.storageUrl}`
+
+            // Add suggestions in consistent format
+            if (imageData.suggestions && imageData.suggestions.length > 0) {
+              responseText += `\n\n**Suggestions**: ${imageData.suggestions.join(' • ')}`
+            }
           } else {
             responseText = `**Image Generation Failed**: ${imageResult.error}\n\nPlease try again with a different prompt.`
           }
@@ -105,28 +105,33 @@ export class ChatService {
         }
       } else if (detectedIntent === IntentType.EDIT_IMAGE && !skipIntentDetection) {
         // Handle image editing request
+        logger.info('Starting image editing request', { sessionId: finalSessionId, instruction: message })
+
         try {
-                  const editingResult = await imageEditingService.editImage({
-          editInstruction: message,
-          sessionId: finalSessionId
-        })
+          const editingResult = await imageEditingService.editImage({
+            editInstruction: message,
+            sessionId: finalSessionId
+          })
 
           if (editingResult.success && editingResult.data) {
-            responseText = `**Image Edited Successfully!**\n\n${editingResult.data.enhancedInstruction}\n\n` +
-              `**Edit Type**: ${editingResult.data.editType}\n` +
-              `**Processing Time**: ${(editingResult.data.editingTime / 1000).toFixed(1)}s\n\n` +
-              `The edited image has been saved to your session. You can view it in the image gallery.`
+            responseText = `${editingResult.data.editedImage.storageUrl}`
+
+            // Add helpful context and suggestions
+            if (editingResult.data.suggestions && editingResult.data.suggestions.length > 0) {
+              responseText += `\n\n**Suggestions**: ${editingResult.data.suggestions.join(' • ')}`
+            }
           } else {
-            responseText = `**Image Editing Failed**: ${editingResult.error}\n\n` +
-              `This could be because:\n` +
-              `• No images available for editing (try uploading an image first)\n` +
-              `• The editing instruction wasn't clear\n` +
-              `• Technical issue with the editing service\n\n` +
-              `Try: "Upload an image" or "Generate an image first"`
+            // Use the enhanced contextual error message from the graph
+            responseText = editingResult.error || 'Image editing failed'
+
+            // Add suggestions if available
+            if (editingResult.suggestions && editingResult.suggestions.length > 0) {
+              responseText += `\n\n**Try these options**: ${editingResult.suggestions.join(' • ')}`
+            }
           }
         } catch (error) {
           logger.error('Image editing error in chat service:', error)
-          responseText = `**Image Editing Error**: I encountered a technical issue. Please try again later.`
+          responseText = `I encountered a technical issue while trying to edit the image. Please try again, or upload/generate a new image first.`
         }
       } else {
         // Process with chat graph for regular conversation

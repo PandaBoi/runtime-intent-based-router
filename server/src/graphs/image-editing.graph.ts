@@ -178,9 +178,16 @@ export class ImageEditingGraph {
         const determinedImageId = await this.determineTargetImage(request.sessionId, request.editInstruction)
         targetImageId = determinedImageId || undefined
         if (!targetImageId) {
+          // Get contextual error message based on session state
+          const contextualError = await this.getContextualErrorMessage(request.sessionId, request.editInstruction)
           return {
             success: false,
-            error: 'No suitable image found for editing. Please upload an image or specify which image to edit.'
+            error: contextualError,
+            suggestions: [
+              'Upload an image to edit',
+              'Generate an image first, then edit it',
+              'Try: "Create a sunset image and then make it brighter"'
+            ]
           }
         }
       }
@@ -277,6 +284,56 @@ export class ImageEditingGraph {
         error: error instanceof Error ? error.message : String(error),
         editingTime: Date.now() - startTime
       }
+    }
+  }
+
+  /**
+   * Gets contextual error message when no images are available for editing
+   */
+  private async getContextualErrorMessage(sessionId: string, instruction: string): Promise<string> {
+    try {
+      const session = await sessionManager.getSession(sessionId)
+      if (!session) {
+        return 'Session not found. Please refresh and try again.'
+      }
+
+      const hasUploadedImages = session.uploadedImages.size > 0
+      const hasGeneratedImages = session.generatedImages.size > 0
+      const conversationHistory = session.conversationHistory
+
+      // Analyze the instruction to provide specific guidance
+      const instructionLower = instruction.toLowerCase()
+      const isSpecificEdit = instructionLower.includes('gothic') ||
+                            instructionLower.includes('brighter') ||
+                            instructionLower.includes('style') ||
+                            instructionLower.includes('color')
+
+      if (!hasUploadedImages && !hasGeneratedImages) {
+        if (isSpecificEdit) {
+          return `I'd love to ${instruction.toLowerCase()}, but I don't see any images to edit yet. ` +
+                 `You can either upload an image or generate one first. ` +
+                 `For example, try "Generate a landscape image" first, then I can make it gothic and satanic.`
+        }
+        return 'No images available for editing. Please upload an image or generate one first. ' +
+               'Try: "Upload an image" or "Generate a beautiful landscape"'
+      }
+
+      if (hasGeneratedImages && !hasUploadedImages) {
+        return 'I found some generated images in our conversation, but they might have expired. ' +
+               'Try generating a new image first, then ask me to edit it.'
+      }
+
+      if (hasUploadedImages && !hasGeneratedImages) {
+        return 'I found some uploaded images in our conversation, but I\'m having trouble accessing them. ' +
+               'Try uploading a new image or generating one fresh.'
+      }
+
+      // General fallback
+      return 'I couldn\'t find a suitable image to edit. Please specify which image to edit or upload/generate a new one.'
+
+    } catch (error) {
+      logger.error('Error generating contextual error message', { sessionId, error: error instanceof Error ? error.message : String(error) })
+      return 'Unable to find an image to edit. Please upload an image or generate one first.'
     }
   }
 

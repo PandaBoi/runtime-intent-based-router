@@ -23,6 +23,7 @@ export interface ImageEditingServiceResponse {
     suggestions: string[]
   }
   error?: string
+  suggestions?: string[]
 }
 
 export interface ImageEditingServiceInfo {
