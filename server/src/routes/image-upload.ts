@@ -108,16 +108,17 @@ router.post('/upload', upload.single('image'), async (req, res) => {
     })
 
   } catch (error) {
-    logger.error('Image upload failed', { error: error.message })
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    logger.error('Image upload failed', { error: errorMsg })
 
-    if (error.code === 'LIMIT_FILE_SIZE') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         success: false,
         error: 'File size too large. Maximum size is 10MB.'
       })
     }
 
-    if (error.message === 'Only image files are allowed') {
+    if (errorMsg === 'Only image files are allowed') {
       return res.status(400).json({
         success: false,
         error: 'Only image files are allowed. Please upload a JPEG, PNG, or WebP image.'
@@ -173,7 +174,7 @@ router.get('/:imageId', async (req, res) => {
     })
 
   } catch (error) {
-    logger.error('Failed to get image metadata', { error: error.message })
+    logger.error('Failed to get image metadata', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to get image metadata'
@@ -207,7 +208,7 @@ router.get('/', async (req, res) => {
     })
 
   } catch (error) {
-    logger.error('Failed to get session images', { error: error.message })
+    logger.error('Failed to get session images', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to get session images'
@@ -275,7 +276,7 @@ router.post('/edit', async (req, res) => {
     }
 
   } catch (error) {
-    logger.error('Direct image editing failed', { error: error.message })
+    logger.error('Direct image editing failed', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({
       success: false,
       error: 'Failed to edit image'

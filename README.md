@@ -1,10 +1,10 @@
 # Intent-Based Routing Chat Application
 
-A minimal intent-based routing chat application built with Inworld Runtime, featuring three core AI services: text chatbot, image generation, and image editing. This application demonstrates a graph-based architecture for intelligent request routing using Inworld Runtime's graph primitives.
+An intent-based routing chat application built with Inworld Runtime, featuring text chatbot, image generation, and image editing services.
 
-## Architecture Overview
+## Architecture
 
-Our application uses a modular graph-based architecture inspired by [Inworld's runtime-chat-with-docs](https://github.com/inworld-ai/runtime-chat-with-docs/tree/main) demo. The system routes user requests through specialized graphs:
+The application uses a modular graph-based architecture that routes user requests through specialized graphs:
 
 ```mermaid
 graph TD
@@ -12,21 +12,21 @@ graph TD
     B --> C[System Prompt:<br/>Intent Classification]
     C --> D[RemoteLLMChatNode<br/>OpenAI GPT-4o-mini<br/>Temperature: 0.1]
     D --> E{Intent Classification}
-    
+
     E -->|CHAT| F[Chat Graph]
     E -->|GENERATE_IMAGE| G[Image Generation Graph]
     E -->|EDIT_IMAGE| H[Image Editing Graph]
-    
+
     F --> I[System Prompt:<br/>Helpful Assistant]
     I --> J[RemoteLLMChatNode<br/>OpenAI GPT-4o-mini<br/>Temperature: 0.7<br/>Streaming: true]
     J --> K[Chat Response]
-    
+
     G --> L[Image Generation Service<br/>Black Forest Labs Flux API]
     L --> M[Generated Image]
-    
+
     H --> N[Image Editing Service<br/>Black Forest Labs Flux API]
     N --> O[Edited Image]
-    
+
     style B fill:#e1f5fe
     style F fill:#f3e5f5
     style G fill:#fff3e0
@@ -37,189 +37,173 @@ graph TD
 
 ### Graph Components
 
-#### 1. Intent Detection Graph ✅
-- **Purpose**: Classifies user input into CHAT, GENERATE_IMAGE, or EDIT_IMAGE
-- **Architecture**: `RemoteLLMChatNode` with classification prompt
-- **Configuration**: Low temperature (0.1) for consistent classification
-- **Output**: JSON with intent, confidence, and reasoning
-- **Test Results**: 93-98% accuracy across all intent types
+#### Intent Detection Graph
+- Classifies user input into CHAT, GENERATE_IMAGE, or EDIT_IMAGE
+- Uses `RemoteLLMChatNode` with low temperature (0.1) for consistent classification
+- Returns JSON with intent, confidence, and reasoning
 
-#### 2. Chat Graph ✅
-- **Purpose**: Handles general conversation
-- **Architecture**: `RemoteLLMChatNode` with conversation history
-- **Configuration**: Higher temperature (0.7) for creative responses, streaming enabled
-- **Features**: Maintains conversation context, session management
+#### Chat Graph
+- Handles general conversation with conversation history
+- Uses `RemoteLLMChatNode` with higher temperature (0.7) for creative responses
+- Supports streaming responses
 
-#### 3. Image Generation Graph 🔄
-- **Purpose**: Creates new images from text descriptions
-- **Integration**: Black Forest Labs Flux API
-- **Input**: Text prompts extracted from user intent
+#### Image Generation Graph
+- Creates images from text descriptions
+- Integrates with Black Forest Labs Flux API
+- Includes LLM prompt enhancement and session tracking
 
-#### 4. Image Editing Graph 🔄
-- **Purpose**: Modifies existing images based on instructions
-- **Integration**: Black Forest Labs Flux API  
-- **Input**: Images + editing instructions
+#### Image Editing Graph
+- Modifies existing images based on natural language instructions
+- Context-aware targeting ("edit the last image")
+- References previously generated/uploaded images
 
 ## Quick Start
 
+### Prerequisites
+- Node.js 18+
+- [Inworld API Key](https://platform.inworld.ai) (required)
+- [Flux API Key](https://api.bfl.ai) (optional - has mock mode)
+
+### Setup
 ```bash
-# Install server dependencies
+# Clone and install
+git clone <repository-url>
+cd runtime-intent-based-router
+cd server && npm install
+cd ../client && npm install
+
+# Configure environment
 cd server
-npm install
+cp env.example.complete .env
+# Edit .env: Set INWORLD_API_KEY=your_key_here
 
-# Install client dependencies  
-cd ../client
-npm install
-
-# Set up environment variables
-cd ../server
-cp .env.example .env
-# Add your INWORLD_API_KEY to .env
-
-# Start the server
+# Start application
+# Terminal 1: Server
 npm run dev
 
-# In another terminal, start the client
+# Terminal 2: Client
 cd ../client
 npm start
 ```
 
-## Environment Variables
+Open http://localhost:3000 and try:
+- "Hello there!" (chat)
+- "Generate a sunset image" (image generation)
+- "Edit the last image to be brighter" (image editing)
 
+## Configuration
+
+### Required Environment Variables
 ```env
-# server/.env
-INWORLD_API_KEY=your_inworld_api_key
+INWORLD_API_KEY=your_key_here
 PORT=3001
 NODE_ENV=development
 CORS_ORIGIN=http://localhost:3000
-
-# Optional for image services (when implemented)
-FLUX_API_KEY=your_flux_api_key
 ```
+
+### Optional Variables
+```env
+# Flux API for real image generation
+FLUX_API_KEY=your_flux_key_here
+FLUX_USE_MOCK=true  # Keep true for development (no API costs)
+
+# OpenAI override (uses Inworld key by default)
+OPENAI_API_KEY=sk-...
+```
+
+See [env.example.complete](env.example.complete) for all configuration options.
 
 ## Testing
 
-We maintain comprehensive tests to ensure reliability:
-
 ```bash
-# Run all tests
 cd server
+
+# Run all tests
 npm test
 
-# Run tests with coverage
+# Run specific tests
+npm test -- --testPathPattern="image-generation.service.test.ts"
+npm test -- --testPathPattern="intent-detection.service.test.ts"
+
+# Coverage
 npm run test:coverage
-
-# Run tests in watch mode
-npm run test:watch
-
-# Test the graph execution directly
-npm run test:graph
-```
-
-**Test Coverage:**
-- ✅ Intent Detection: All three intent types with various inputs
-- ✅ Graph Execution: Direct graph testing with live API
-- ✅ API Endpoints: Integration tests for all routes
-- 🔄 Image Services: Tests planned for Flux API integration
-
-## Usage Examples
-
-**Intent Detection Results:**
-```bash
-# Chat Intent
-"Hello, how are you?" → chat (95% confidence)
-
-# Image Generation Intent  
-"Generate an image of a sunset" → generate-image (98% confidence)
-
-# Image Editing Intent
-"Make this photo brighter" → edit-image (93% confidence)
 ```
 
 ## Project Structure
 
 ```
-server/
-├── src/
-│   ├── graphs/           # Graph definitions (NEW!)
-│   │   ├── intent-detection.graph.ts
-│   │   ├── chat.graph.ts
-│   │   └── image.graphs.ts (planned)
-│   ├── services/         # Service implementations
-│   │   ├── intent-detection.service.ts
-│   │   └── chat-service.ts
-│   ├── routes/           # API endpoints
-│   │   ├── chat.ts
-│   │   ├── health.ts
-│   │   └── test.ts
-│   ├── utils/            # Utilities
-│   │   ├── logger.ts
-│   │   └── error-handler.ts
-│   ├── types/            # TypeScript definitions
-│   ├── config/           # Configuration
-│   └── __tests__/        # Test suite
-├── jest.config.js
-├── package.json
-└── .env
-
-client/
-├── src/
-│   ├── components/
-│   └── services/
-├── package.json
-└── public/
+/
+├── server/                    # Backend API
+│   ├── src/
+│   │   ├── graphs/           # AI Graph Definitions
+│   │   │   ├── intent-detection.graph.ts
+│   │   │   ├── chat.graph.ts
+│   │   │   ├── image-generation.graph.ts
+│   │   │   └── image-editing.graph.ts
+│   │   ├── services/         # Business Logic
+│   │   │   ├── intent-detection.service.ts
+│   │   │   ├── chat-service.ts
+│   │   │   ├── image-generation.service.ts
+│   │   │   ├── image-editing.service.ts
+│   │   │   ├── session-manager.service.ts
+│   │   │   ├── flux-api.service.ts
+│   │   │   └── flux-mock.service.ts
+│   │   ├── routes/           # API Endpoints
+│   │   │   ├── unified-chat.ts
+│   │   │   ├── image-upload.ts
+│   │   │   ├── health.ts
+│   │   │   └── test.ts
+│   │   ├── config/           # Configuration System
+│   │   ├── types/            # TypeScript Definitions
+│   │   ├── utils/            # Utilities
+│   │   └── __tests__/        # Test Suite
+│   ├── logs/                 # Application logs
+│   ├── uploads/              # Image storage
+│   └── .env                  # Environment config
+├── client/                   # Frontend
+│   ├── public/
+│   └── package.json
+└── env.example.complete      # Configuration template
 ```
 
-## Development
+## Troubleshooting
 
-### Graph-Based Architecture Benefits
+### Common Issues
 
-1. **Modularity**: Each graph handles a specific concern
-2. **Reusability**: Graphs can be composed and reused
-3. **Testability**: Individual graph components can be tested in isolation
-4. **Scalability**: Easy to add new graphs for additional services
-5. **Maintainability**: Clear separation between intent detection, chat, and image services
+**Port already in use**
+```bash
+lsof -ti:3001 | xargs kill -9
+```
 
-### Adding New Graphs
+**Cannot connect to Inworld API**
+- Verify `INWORLD_API_KEY` is correct
+- Check network connectivity
 
-Following the [runtime-chat-with-docs](https://github.com/inworld-ai/runtime-chat-with-docs/tree/main) pattern:
+**402 Payment Required from Flux API**
+- Set `FLUX_USE_MOCK=true` in `.env`
 
-1. Create new graph class in `src/graphs/`
-2. Define configuration interface
-3. Implement `build()`, `execute()`, and `destroy()` methods
-4. Add corresponding service integration
-5. Update intent detection if needed
+**Tests hanging**
+- Tests use mock mode automatically
+- Minor gRPC cleanup warnings are harmless
 
-### Key Lessons Learned
+**TypeScript errors**
+```bash
+npm run build  # Should show 0 errors
+```
 
-- Use `provider: 'openai'` with `modelName: 'gpt-4o-mini'` for reliable LLM access
-- `graph.start()` returns `GraphOutputStream` directly, not `{outputStream}`
-- Low temperature (0.1) for classification, higher (0.7) for creative responses
-- Comprehensive testing prevents regression during development
+### Development Tips
+- Use mock mode (`FLUX_USE_MOCK=true`) during development
+- Check logs in `server/logs/app.log`
+- Client auto-refreshes, server needs restart for `.env` changes
 
 ## Tech Stack
 
 - **Backend**: Node.js, Express, TypeScript
-- **Frontend**: HTML, CSS, JavaScript (TypeScript)
+- **Frontend**: HTML, CSS, JavaScript
 - **AI Runtime**: Inworld Runtime (@inworld/runtime) v0.5.2
-- **Graph Architecture**: RemoteLLMChatNode, GraphBuilder patterns
-- **Image Services**: Black Forest Labs Flux API (planned)
-- **Testing**: Jest with supertest, integration tests
-- **Logging**: Winston with structured logging
-
-## Contributing
-
-This project showcases Inworld Runtime's graph-based architecture. The codebase is designed to be:
-- **Educational**: Clear examples of graph patterns
-- **Extensible**: Easy to add new services and intents
-- **Production-Ready**: Proper error handling, logging, and testing
-
-## Feedback
-
-We maintain detailed feedback for the Inworld Runtime team in `inworld-runtime-feedback.md`, documenting:
-- Issues encountered and resolutions
-- API improvements and suggestions  
-- Working code patterns and best practices
+- **Image Services**: Black Forest Labs Flux API
+- **Testing**: Jest with supertest
+- **Logging**: Winston
 
 ## License
 

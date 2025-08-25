@@ -148,7 +148,7 @@ Now classify this user input:`
           isIterable: outputStream && typeof outputStream[Symbol.asyncIterator] === 'function'
         })
       } catch (error) {
-        logger.error('Error calling graph.start()', { error: error.message, stack: error.stack })
+        logger.error('Error calling graph.start()', { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined })
         throw error
       }
 
@@ -233,10 +233,11 @@ Now classify this user input:`
         throw new IntentDetectionError('No valid response received from LLM')
       }
 
+      const validIntentResult = intentResult as IntentResult
       logger.info('Intent detected via graph-based LLM', {
         input: input.substring(0, 50),
-        intent: intentResult.intent,
-        confidence: intentResult.confidence,
+        intent: validIntentResult.intent,
+        confidence: validIntentResult.confidence,
         llmResponse: responseText.substring(0, 100)
       })
 

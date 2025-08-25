@@ -69,7 +69,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
           imageEditing: true, // Now available!
           conversationHistory: true,
           sessionPersistence: true
-        }
+        },
+        suggestions: undefined as string[] | undefined
       },
       timestamp: new Date()
     }
@@ -98,13 +99,15 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
  */
 router.post('/sessions', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await chatService.createSession()
+    logger.info('Session creation endpoint called')
+    const sessionId = await chatService.createSession()
+    logger.info('Session created successfully', { sessionId })
 
     res.json({
       success: true,
       data: {
-        sessionId: result.sessionId,
-        message: result.message,
+        sessionId: sessionId,
+        message: 'Session created successfully',
         capabilities: {
           imageGeneration: true,
           imageEditing: true,
@@ -115,6 +118,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
       timestamp: new Date()
     })
   } catch (error) {
+    logger.error('Session creation failed', { error: error instanceof Error ? error.message : String(error) })
     next(error)
   }
 })
@@ -279,7 +283,7 @@ router.get('/suggestions/:sessionId', async (req: Request, res: Response, next: 
     const suggestions = []
 
     // Add image-related suggestions
-    if (imageGenSuggestions.success) {
+    if (imageGenSuggestions.success && imageGenSuggestions.data) {
       suggestions.push(...imageGenSuggestions.data)
     }
 

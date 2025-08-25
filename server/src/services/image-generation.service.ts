@@ -46,6 +46,14 @@ export class ImageGenerationService {
         throw new Error('Invalid session ID')
       }
 
+      // Validate prompt is not empty
+      if (!prompt || prompt.trim().length === 0) {
+        return {
+          success: false,
+          error: 'Image prompt cannot be empty'
+        }
+      }
+
       // Prepare image generation request
       const request: ImageGenerationRequest = {
         prompt,
@@ -111,7 +119,7 @@ export class ImageGenerationService {
 
       return {
         success: false,
-        error: `Image generation failed: ${error.message}`,
+        error: `Image generation failed: ${error instanceof Error ? error.message : String(error)}`,
         timestamp: new Date()
       }
     }

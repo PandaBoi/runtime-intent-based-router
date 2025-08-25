@@ -3,7 +3,7 @@ import {
   GraphTypes,
   RemoteLLMChatNode
 } from '@inworld/runtime/graph'
-import { v4 as uuidv4 } from 'uuid'
+import crypto from 'crypto'
 import { config } from '../config'
 import { fluxApiService } from '../services/flux-api.service'
 import { sessionManager } from '../services/session-manager.service'
@@ -54,10 +54,10 @@ export interface ImageEditingGraphConfig {
 export const DEFAULT_IMAGE_EDITING_CONFIG: ImageEditingGraphConfig = {
   contextAnalysisEnabled: true,
   instructionEnhancementEnabled: true,
-  provider: 'openai',
-  modelName: 'gpt-4o-mini',
-  temperature: 0.7, // Balanced creativity for instruction enhancement
-  maxTokens: 300
+  provider: config.llm.provider,
+  modelName: config.llm.defaultModel,
+  temperature: config.llm.imageEditing.instructionEnhancement.temperature, // Use instruction enhancement as default
+  maxTokens: config.llm.imageEditing.instructionEnhancement.maxTokens
 }
 
 export class ImageEditingGraph {
@@ -88,12 +88,12 @@ export class ImageEditingGraph {
       if (this.config.contextAnalysisEnabled) {
         this.contextAnalyzerNode = new RemoteLLMChatNode({
           id: 'image_context_analyzer_llm',
-          provider: 'openai',
-          modelName: 'gpt-4o-mini',
-          stream: false,
+          provider: this.config.provider,
+          modelName: this.config.modelName,
+          stream: config.llm.imageEditing.contextAnalysis.stream,
           textGenerationConfig: {
-            maxNewTokens: 400,
-            temperature: 0.3
+            maxNewTokens: config.llm.imageEditing.contextAnalysis.maxTokens,
+            temperature: config.llm.imageEditing.contextAnalysis.temperature
           }
         })
       }
@@ -102,12 +102,12 @@ export class ImageEditingGraph {
       if (this.config.instructionEnhancementEnabled) {
         this.instructionEnhancerNode = new RemoteLLMChatNode({
           id: 'editing_instruction_enhancer_llm',
-          provider: 'openai',
-          modelName: 'gpt-4o-mini',
-          stream: false,
+          provider: this.config.provider,
+          modelName: this.config.modelName,
+          stream: config.llm.imageEditing.instructionEnhancement.stream,
           textGenerationConfig: {
-            maxNewTokens: 300,
-            temperature: 0.8
+            maxNewTokens: config.llm.imageEditing.instructionEnhancement.maxTokens,
+            temperature: config.llm.imageEditing.instructionEnhancement.temperature
           }
         })
       }
@@ -149,7 +149,7 @@ export class ImageEditingGraph {
       logger.info('Image editing graph built successfully')
 
     } catch (error) {
-      logger.error('Failed to build image editing graph', { error: error.message })
+      logger.error('Failed to build image editing graph', { error: error instanceof Error ? error.message : String(error) })
       throw error
     }
   }
@@ -230,7 +230,7 @@ export class ImageEditingGraph {
 
       // Step 5: Store edited image in session
       const editedImageMetadata: ImageMetadata = {
-        id: uuidv4(),
+        id: crypto.randomUUID(),
         originalName: `edited_${originalImage.originalName}`,
         mimeType: originalImage.mimeType,
         size: editingResult.size || originalImage.size,
@@ -268,13 +268,13 @@ export class ImageEditingGraph {
     } catch (error) {
       logger.error('Image editing workflow failed', {
         sessionId: request.sessionId,
-        error: error.message,
-        stack: error.stack
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
       })
 
       return {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         editingTime: Date.now() - startTime
       }
     }
@@ -329,7 +329,7 @@ export class ImageEditingGraph {
       return allImages[0].id
 
     } catch (error) {
-      logger.error('Failed to determine target image', { sessionId, error: error.message })
+      logger.error('Failed to determine target image', { sessionId, error: error instanceof Error ? error.message : String(error) })
       return null
     }
   }
@@ -379,7 +379,7 @@ Respond with JSON:
         ]
       }
 
-      const outputStream = this.graph.start(new GraphTypes.LLMChatRequest(graphInput), uuidv4())
+      const outputStream = this.graph.start(new GraphTypes.LLMChatRequest(graphInput), crypto.randomUUID())
       if (!outputStream) {
         throw new Error('Failed to start image editing graph')
       }
@@ -424,7 +424,7 @@ Respond with JSON:
       }
 
     } catch (error) {
-      logger.error('Failed to enhance editing instruction', { error: error.message })
+      logger.error('Failed to enhance editing instruction', { error: error instanceof Error ? error.message : String(error) })
       return {
         enhancedInstruction: instruction,
         editType: 'enhance'
@@ -466,10 +466,10 @@ Respond with JSON:
       }
 
     } catch (error) {
-      logger.error('Image editing API call failed', { error: error.message })
+      logger.error('Image editing API call failed', { error: error instanceof Error ? error.message : String(error) })
       return {
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       }
     }
   }
@@ -543,7 +543,7 @@ Respond with JSON:
 
       logger.info('Image editing graph destroyed')
     } catch (error) {
-      logger.error('Error destroying image editing graph', { error: error.message })
+      logger.error('Error destroying image editing graph', { error: error instanceof Error ? error.message : String(error) })
     }
   }
 }

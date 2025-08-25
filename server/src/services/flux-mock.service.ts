@@ -43,11 +43,11 @@ export class FluxMockService {
     // Simulate different generation times based on model
     const modelTimes = {
       'flux-1-pro': 90000,     // 90 seconds
-      'flux-1-dev': 20000,     // 20 seconds
+      'flux-dev': 20000,     // 20 seconds
       'flux-1-schnell': 8000   // 8 seconds
     }
 
-    const model = request.model || 'flux-1-dev'
+    const model = request.model || 'flux-dev'
     const expectedDuration = modelTimes[model as keyof typeof modelTimes] || 20000
 
     // Store generation info for polling
@@ -137,20 +137,20 @@ export class FluxMockService {
 
   async getModels(): Promise<FluxModels> {
     return {
-      'flux-1-pro': {
-        description: 'Highest quality, slower generation (MOCK)',
-        maxResolution: '2048x2048',
-        typical_time: '60-120s'
+      'flux-pro-1.1': {
+        description: 'Latest FLUX 1.1 pro model' as const,
+        maxResolution: '2048x2048' as const,
+        typical_time: '60-120s' as const
       },
-      'flux-1-dev': {
-        description: 'Balanced quality and speed (MOCK)',
-        maxResolution: '1024x1024',
-        typical_time: '15-30s'
+      'flux-pro': {
+        description: 'FLUX.1 pro model' as const,
+        maxResolution: '2048x2048' as const,
+        typical_time: '30-60s' as const
       },
-      'flux-1-schnell': {
-        description: 'Fastest generation, good quality (MOCK)',
-        maxResolution: '1024x1024',
-        typical_time: '5-10s'
+      'flux-dev': {
+        description: 'FLUX.1 dev model for testing' as const,
+        maxResolution: '1440x1440' as const,
+        typical_time: '10-20s' as const
       }
     }
   }
@@ -205,10 +205,10 @@ export class FluxMockService {
       }
 
     } catch (error) {
-      logger.error('Mock image editing failed', { error: error.message })
+      logger.error('Mock image editing failed', { error: error instanceof Error ? error.message : String(error) })
       return {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         processingTime: Date.now() - startTime
       }
     }
@@ -220,7 +220,7 @@ export class FluxMockService {
 
   getDefaultParameters(): Partial<FluxImageGenerationRequest> {
     return {
-      model: 'flux-1-dev',
+      model: 'flux-dev',
       width: 1024,
       height: 1024,
       num_inference_steps: 50,

@@ -70,7 +70,7 @@ export class ImageEditingService {
         instructionEnhancement: this.graph.getConfig().instructionEnhancementEnabled
       })
     } catch (error) {
-      logger.error('Failed to initialize image editing service', { error: error.message })
+      logger.error('Failed to initialize image editing service', { error: error instanceof Error ? error.message : String(error) })
       throw error
     }
   }
@@ -136,13 +136,13 @@ export class ImageEditingService {
     } catch (error) {
       logger.error('Image editing service error', {
         sessionId: request.sessionId,
-        error: error.message,
-        stack: error.stack
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
       })
 
       return {
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       }
     }
   }
@@ -160,7 +160,7 @@ export class ImageEditingService {
     } catch (error) {
       logger.error('Failed to get editable images', {
         sessionId,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       })
       return []
     }
@@ -211,7 +211,7 @@ export class ImageEditingService {
     } catch (error) {
       logger.error('Failed to get editing suggestions', {
         sessionId,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       })
       return this.getDefaultEditingSuggestions()
     }
@@ -280,7 +280,7 @@ export class ImageEditingService {
 
       return this.graph.isReady()
     } catch (error) {
-      logger.error('Image editing service health check failed', { error: error.message })
+      logger.error('Image editing service health check failed', { error: error instanceof Error ? error.message : String(error) })
       return false
     }
   }
@@ -291,7 +291,7 @@ export class ImageEditingService {
       this.isInitialized = false
       logger.info('Image editing service disconnected')
     } catch (error) {
-      logger.error('Error disconnecting image editing service', { error: error.message })
+      logger.error('Error disconnecting image editing service', { error: error instanceof Error ? error.message : String(error) })
     }
   }
 }

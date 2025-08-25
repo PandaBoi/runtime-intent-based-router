@@ -19,17 +19,16 @@ async function testFullIntegration() {
 
     // Test 2: Create session
     console.log('\n📝 Creating session...')
-    const sessionResponse = await chatService.createSession()
-    sessionId = sessionResponse.sessionId
+    sessionId = await chatService.createSession()
     console.log('✅ Session created:', sessionId)
 
     // Test 3: Regular chat message
     console.log('\n💬 Testing regular chat...')
     const chatResult = await chatService.processMessage('Hello, how are you?', sessionId)
     console.log('✅ Chat response:', {
-      id: chatResult.message.id,
-      content: chatResult.message.content.substring(0, 100),
-      detectedIntent: chatResult.context?.lastIntent
+      id: chatResult.id,
+      content: chatResult.content.substring(0, 100),
+      sessionId: chatResult.sessionId
     })
 
     // Test 4: Image generation intent
@@ -39,11 +38,9 @@ async function testFullIntegration() {
       sessionId
     )
     console.log('✅ Image generation response:', {
-      id: imageGenResult.message.id,
-      isImageGeneration: imageGenResult.message.content.includes('Image Generated'),
-      detectedIntent: imageGenResult.context?.lastIntent,
-      hasImages: imageGenResult.context?.hasImages,
-      imageCount: imageGenResult.context?.stats?.imageCount
+      id: imageGenResult.id,
+      isImageGeneration: imageGenResult.content.includes('Image Generated'),
+      sessionId: imageGenResult.sessionId
     })
 
     // Test 5: Session context verification
@@ -64,8 +61,8 @@ async function testFullIntegration() {
       sessionId
     )
     console.log('✅ Follow-up response:', {
-      content: followUpResult.message.content.substring(0, 100),
-      maintainedContext: followUpResult.context?.conversationLength > 2
+      content: followUpResult.content.substring(0, 100),
+      sessionId: followUpResult.sessionId
     })
 
     // Test 7: Another image generation request
@@ -75,9 +72,8 @@ async function testFullIntegration() {
       sessionId
     )
     console.log('✅ Second image generation:', {
-      isImageGeneration: secondImageResult.message.content.includes('Image Generated'),
-      totalImages: secondImageResult.context?.stats?.imageCount,
-      sessionContinuity: secondImageResult.context?.conversationLength
+      isImageGeneration: secondImageResult.content.includes('Image Generated'),
+      sessionId: secondImageResult.sessionId
     })
 
     // Test 8: Image editing intent (should show coming soon message)
@@ -87,8 +83,8 @@ async function testFullIntegration() {
       sessionId
     )
     console.log('✅ Image editing response:', {
-      isComingSoon: editResult.message.content.includes('Coming Soon'),
-      detectedAsEdit: editResult.message.content.includes('Image Editing')
+      content: editResult.content.substring(0, 100),
+      sessionId: editResult.sessionId
     })
 
     // Test 9: Get session history
@@ -107,7 +103,7 @@ async function testFullIntegration() {
     const healthChecks = {
       intentDetection: await intentDetectionService.healthCheck(),
       imageGeneration: await imageGenerationService.healthCheck(),
-      chatService: chatService.getServiceInfo?.() || true
+      chatService: true // Chat service is working if we got this far
     }
     console.log('✅ Health status:', healthChecks)
 
@@ -115,17 +111,17 @@ async function testFullIntegration() {
     console.log('\n⏱️ Performance summary...')
     const session = await sessionManager.getSession(sessionId)
     if (session) {
-      console.log('✅ Session stats:', {
-        duration: `${session.stats.sessionDuration} minutes`,
-        messageCount: session.stats.messageCount,
-        imageCount: session.stats.imageCount,
-        intentDistribution: session.stats.intentDistribution
+      console.log('✅ Session info:', {
+        sessionId: session.sessionId,
+        messageCount: session.conversationHistory.length,
+        created: session.createdAt,
+        lastActivity: session.lastActivity
       })
     }
 
   } catch (error) {
-    console.error('❌ Integration test failed:', error.message)
-    if (error.stack) {
+    console.error('❌ Integration test failed:', error instanceof Error ? error.message : String(error))
+    if (error instanceof Error && error.stack) {
       console.error('Stack trace:', error.stack)
     }
   } finally {
@@ -140,7 +136,7 @@ async function testFullIntegration() {
       await imageGenerationService.disconnect()
       console.log('✅ Image generation service disconnected')
     } catch (error) {
-      console.warn('Warning during cleanup:', error.message)
+      console.warn('Warning during cleanup:', error instanceof Error ? error.message : String(error))
     }
   }
 

@@ -125,8 +125,8 @@ async function testImageGeneration() {
     })
 
   } catch (error) {
-    console.error('❌ Test failed:', error.message)
-    if (error.stack) {
+    console.error('❌ Test failed:', error instanceof Error ? error.message : String(error))
+    if (error instanceof Error && error.stack) {
       console.error('Stack trace:', error.stack)
     }
   } finally {
@@ -135,7 +135,7 @@ async function testImageGeneration() {
       await imageGenerationService.disconnect()
       console.log('\n🧹 Service disconnected')
     } catch (error) {
-      console.warn('Warning during cleanup:', error.message)
+      console.warn('Warning during cleanup:', error instanceof Error ? error.message : String(error))
     }
   }
 

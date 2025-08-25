@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import 'dotenv/config'
 
 // Copy the exact pattern from the examples
@@ -51,9 +52,10 @@ async function testBasicLLM() {
   console.log('📤 Starting graph with LLMChatRequest...')
 
   try {
-    // This is the exact line from the examples
-    const { outputStream } = graph.start(
+    // This is the correct pattern used in our working graphs
+    const outputStream = graph.start(
       new GraphTypes.LLMChatRequest(graphInput),
+      crypto.randomUUID()
     )
 
     console.log('✅ Got outputStream, starting iteration...')
@@ -86,7 +88,7 @@ async function testBasicLLM() {
     console.log('🎉 Test completed successfully!')
 
   } catch (error) {
-    console.error('💥 Error:', error.message)
+    console.error('💥 Error:', error instanceof Error ? error.message : String(error))
     throw error
   }
 }

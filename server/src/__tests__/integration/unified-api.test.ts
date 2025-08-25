@@ -98,7 +98,7 @@ describe('Unified API Integration', () => {
     const imagesResponse = await axios.get(`${API_BASE}/sessions/${sessionId}/images`)
     console.log('✅ Session images:', {
       imageCount: imagesResponse.data.data.count,
-      images: imagesResponse.data.data.images?.map(img => ({
+      images: imagesResponse.data.data.images?.map((img: any) => ({
         id: img.id,
         description: img.description?.substring(0, 50)
       }))
@@ -146,11 +146,14 @@ describe('Unified API Integration', () => {
     })
 
   } catch (error) {
-    console.error('❌ API test failed:', {
-      message: error.message,
-      status: error.response?.status,
-      data: error.response?.data
-    })
+    const errorDetails: any = {
+      message: error instanceof Error ? error.message : String(error)
+    }
+    if (error && typeof error === 'object' && 'response' in error) {
+      errorDetails.status = (error as any).response?.status
+      errorDetails.data = (error as any).response?.data
+    }
+    console.error('❌ API test failed:', errorDetails)
   } finally {
     // Cleanup
     if (sessionId) {
@@ -159,7 +162,7 @@ describe('Unified API Integration', () => {
         await axios.delete(`${API_BASE}/sessions/${sessionId}`)
         console.log('✅ Session cleaned up')
       } catch (error) {
-        console.warn('Warning during cleanup:', error.message)
+        console.warn('Warning during cleanup:', error instanceof Error ? error.message : String(error))
       }
     }
   }

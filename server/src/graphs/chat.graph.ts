@@ -21,10 +21,10 @@ export interface ChatGraphConfig {
 }
 
 export const DEFAULT_CHAT_CONFIG: ChatGraphConfig = {
-  provider: 'openai',
-  modelName: 'gpt-4o-mini',
-  temperature: 0.7, // Higher temperature for more creative responses
-  maxTokens: 500,
+  provider: config.llm.provider,
+  modelName: config.llm.defaultModel,
+  temperature: config.llm.chat.temperature,
+  maxTokens: config.llm.chat.maxTokens,
   systemPrompt: `You are a helpful AI assistant. Provide clear, concise, and friendly responses to user questions and requests.`
 }
 
@@ -52,12 +52,12 @@ export class ChatGraph {
       // Create the LLM node for chat
       this.llmNode = new RemoteLLMChatNode({
         id: 'chat_llm',
-        provider: 'openai',
-        modelName: 'gpt-4o-mini',
-        stream: true, // Enable streaming for real-time responses
+        provider: this.config.provider,
+        modelName: this.config.modelName,
+        stream: config.llm.chat.stream,
         textGenerationConfig: {
-          maxNewTokens: 500,
-          temperature: 0.7
+          maxNewTokens: this.config.maxTokens,
+          temperature: this.config.temperature
         }
       })
 

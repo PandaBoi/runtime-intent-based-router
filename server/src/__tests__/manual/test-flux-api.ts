@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { fluxApiService } from './services/flux-api.service'
+import { fluxApiService } from '../../services/flux-api.service'
 
 async function testFluxApi() {
   console.log('🧪 Testing Flux API Service')
@@ -46,7 +46,7 @@ async function testFluxApi() {
     }
 
   } catch (error) {
-    console.error('❌ Test failed:', error.message)
+    console.error('❌ Test failed:', error instanceof Error ? error.message : String(error))
   }
 
   console.log('\n✅ Flux API test completed')

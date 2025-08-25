@@ -4,7 +4,7 @@ import {
   RemoteLLMChatNode
 } from '@inworld/runtime/graph'
 import { renderJinja } from '@inworld/runtime/primitives/llm'
-import { v4 as uuidv4 } from 'uuid'
+import crypto from 'crypto'
 import { config } from '../config'
 import { fluxApiService } from '../services/flux-api.service'
 import { sessionManager } from '../services/session-manager.service'
@@ -50,10 +50,10 @@ export interface ImageGenerationGraphConfig {
 
 export const DEFAULT_IMAGE_GENERATION_CONFIG: ImageGenerationGraphConfig = {
   promptEnhancementEnabled: true,
-  provider: 'openai',
-  modelName: 'gpt-4o-mini',
-  temperature: 0.8, // Higher creativity for prompt enhancement
-  maxTokens: 200
+  provider: config.llm.provider,
+  modelName: config.llm.defaultModel,
+  temperature: config.llm.imageGeneration.promptEnhancement.temperature,
+  maxTokens: config.llm.imageGeneration.promptEnhancement.maxTokens
 }
 
 export class ImageGenerationGraph {
@@ -82,12 +82,12 @@ export class ImageGenerationGraph {
       if (this.config.promptEnhancementEnabled) {
         this.promptEnhancerNode = new RemoteLLMChatNode({
           id: 'prompt_enhancer_llm',
-          provider: 'openai',
-          modelName: 'gpt-4o-mini',
-          stream: false, // We want complete enhanced prompts
+          provider: this.config.provider,
+          modelName: this.config.modelName,
+          stream: config.llm.imageGeneration.promptEnhancement.stream,
           textGenerationConfig: {
-            maxNewTokens: 300,
-            temperature: 0.8
+            maxNewTokens: this.config.maxTokens,
+            temperature: this.config.temperature
           }
         })
 
@@ -156,7 +156,7 @@ export class ImageGenerationGraph {
 
       // Step 3: Create image metadata
       const imageMetadata: ImageMetadata = {
-        id: uuidv4(),
+        id: crypto.randomUUID(),
         originalName: `generated-${Date.now()}.${generatedImage.content_type.split('/')[1]}`,
         mimeType: generatedImage.content_type,
         size: 0, // We don't have size info from URL
@@ -199,7 +199,7 @@ export class ImageGenerationGraph {
 
       return {
         success: false,
-        error: error.message || 'Unknown error during image generation',
+        error: error instanceof Error ? error.message : String(error) || 'Unknown error during image generation',
         generationTime
       }
     }
@@ -231,7 +231,7 @@ export class ImageGenerationGraph {
         ]
       }
 
-      const outputStream = await this.graph.start(new GraphTypes.LLMChatRequest(graphInput), uuidv4())
+      const outputStream = await this.graph.start(new GraphTypes.LLMChatRequest(graphInput), crypto.randomUUID())
 
       let enhancedPrompt = originalPrompt // Fallback to original
 
@@ -261,7 +261,7 @@ export class ImageGenerationGraph {
       return enhancedPrompt.trim() || originalPrompt
 
     } catch (error) {
-      logger.warn('Failed to enhance prompt, using original:', error.message)
+      logger.warn('Failed to enhance prompt, using original:', error instanceof Error ? error.message : String(error))
       return originalPrompt
     }
   }
@@ -304,12 +304,12 @@ RESPOND WITH ONLY THE ENHANCED PROMPT. Do not include explanations or additional
   private getOptimalModel(quality?: string): string {
     switch (quality) {
       case 'fast':
-        return 'flux-1-schnell'
+        return 'flux-dev'  // Use dev model for fast generation
       case 'high':
-        return 'flux-1-pro'
+        return 'flux-pro-1.1'  // Use latest pro model for high quality
       case 'balanced':
       default:
-        return 'flux-1-dev'
+        return 'flux-dev'  // Default to dev model
     }
   }
 

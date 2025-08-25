@@ -60,6 +60,9 @@ export class ChatService {
         sessionId = session.sessionId
       }
 
+      // At this point sessionId is guaranteed to be defined
+      const finalSessionId: string = sessionId!
+
       let detectedIntent = IntentType.CHAT
       let confidence = 1.0
 
@@ -81,40 +84,40 @@ export class ChatService {
         try {
           const imageResult = await imageGenerationService.generateImage(
             message,
-            sessionId,
+            finalSessionId,
             { quality: 'balanced' }
           )
 
           if (imageResult.success && imageResult.data?.imageMetadata) {
             const imageData = imageResult.data
-            responseText = `🎨 **Image Generated Successfully!**\n\n` +
-              `📸 **Image URL**: ${imageData.imageMetadata.storageUrl}\n` +
-              `🎯 **Enhanced Prompt**: ${imageData.enhancedPrompt}\n` +
-              `⏱️ **Generation Time**: ${imageData.generationTime}ms\n` +
-              `💡 **Suggestions**: ${imageData.suggestions?.join(', ')}\n\n` +
+            responseText = `**Image Generated Successfully!**\n\n` +
+              `**Image URL**: ${imageData.imageMetadata!.storageUrl}\n` +
+              `**Enhanced Prompt**: ${imageData.enhancedPrompt}\n` +
+              `**Generation Time**: ${imageData.generationTime}ms\n` +
+              `**Suggestions**: ${imageData.suggestions?.join(', ')}\n\n` +
               `Your image has been added to this session!`
           } else {
-            responseText = `❌ **Image Generation Failed**: ${imageResult.error}\n\nPlease try again with a different prompt.`
+            responseText = `**Image Generation Failed**: ${imageResult.error}\n\nPlease try again with a different prompt.`
           }
         } catch (error) {
           logger.error('Image generation error in chat service:', error)
-          responseText = `❌ **Image Generation Error**: I encountered a technical issue. Please try again later.`
+          responseText = `**Image Generation Error**: I encountered a technical issue. Please try again later.`
         }
       } else if (detectedIntent === IntentType.EDIT_IMAGE && !skipIntentDetection) {
         // Handle image editing request
         try {
-          const editingResult = await imageEditingService.editImage({
-            editInstruction: message,
-            sessionId: sessionId
-          })
+                  const editingResult = await imageEditingService.editImage({
+          editInstruction: message,
+          sessionId: finalSessionId
+        })
 
           if (editingResult.success && editingResult.data) {
-            responseText = `✨ **Image Edited Successfully!**\n\n${editingResult.data.enhancedInstruction}\n\n` +
+            responseText = `**Image Edited Successfully!**\n\n${editingResult.data.enhancedInstruction}\n\n` +
               `**Edit Type**: ${editingResult.data.editType}\n` +
               `**Processing Time**: ${(editingResult.data.editingTime / 1000).toFixed(1)}s\n\n` +
               `The edited image has been saved to your session. You can view it in the image gallery.`
           } else {
-            responseText = `❌ **Image Editing Failed**: ${editingResult.error}\n\n` +
+            responseText = `**Image Editing Failed**: ${editingResult.error}\n\n` +
               `This could be because:\n` +
               `• No images available for editing (try uploading an image first)\n` +
               `• The editing instruction wasn't clear\n` +
@@ -123,11 +126,11 @@ export class ChatService {
           }
         } catch (error) {
           logger.error('Image editing error in chat service:', error)
-          responseText = `❌ **Image Editing Error**: I encountered a technical issue. Please try again later.`
+          responseText = `**Image Editing Error**: I encountered a technical issue. Please try again later.`
         }
       } else {
         // Process with chat graph for regular conversation
-        const outputStream = await this.chatGraph.execute(message, sessionId)
+        const outputStream = await this.chatGraph.execute(message, finalSessionId)
 
         for await (const result of outputStream) {
           await result.processResponse({
@@ -161,7 +164,7 @@ export class ChatService {
         content: responseText,
         timestamp: new Date(),
         role: 'assistant',
-        sessionId
+        sessionId: finalSessionId
       }
 
       // Add to chat graph conversation history
@@ -178,7 +181,7 @@ export class ChatService {
       }
 
       // Add to session
-      await sessionManager.addConversationTurn(sessionId, conversationTurn)
+      await sessionManager.addConversationTurn(finalSessionId, conversationTurn)
 
       logger.info('Chat message processed successfully', {
         sessionId,

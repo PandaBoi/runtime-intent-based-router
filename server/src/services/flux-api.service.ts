@@ -17,7 +17,7 @@ export interface FluxImageGenerationRequest {
 export interface FluxImageEditingRequest {
   imageUrl: string
   instruction: string
-  editType?: 'inpaint' | 'outpaint' | 'enhance' | 'style_transfer' | 'variant'
+  editType?: 'inpaint' | 'outpaint' | 'enhance' | 'style_transfer' | 'variant' | 'expand'
   maskData?: string // Base64 encoded mask for inpainting
   strength?: number // 0.1-1.0 for edit strength
   guidance?: number // Guidance scale for editing
@@ -36,14 +36,17 @@ export interface FluxImageEditingResponse {
 
 export interface FluxImageGenerationResponse {
   id: string
-  status: 'pending' | 'processing' | 'completed' | 'failed'
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'Ready' | 'Error'
   result?: {
-    images: Array<{
+    images?: Array<{
       url: string
       width: number
       height: number
       content_type: string
     }>
+    sample?: string  // BFL API uses 'sample' for single image URL
+    width?: number   // BFL API includes dimensions at result level
+    height?: number
   }
   error?: {
     message: string
@@ -54,20 +57,20 @@ export interface FluxImageGenerationResponse {
 }
 
 export interface FluxModels {
-  'flux-1-pro': {
-    description: 'Highest quality, slower generation'
+  'flux-pro-1.1': {
+    description: 'Latest FLUX 1.1 pro model'
     maxResolution: '2048x2048'
     typical_time: '60-120s'
   }
-  'flux-1-dev': {
-    description: 'Balanced quality and speed'
-    maxResolution: '1024x1024'
-    typical_time: '15-30s'
+  'flux-pro': {
+    description: 'FLUX.1 pro model'
+    maxResolution: '2048x2048'
+    typical_time: '30-60s'
   }
-  'flux-1-schnell': {
-    description: 'Fastest generation, good quality'
-    maxResolution: '1024x1024'
-    typical_time: '5-10s'
+  'flux-dev': {
+    description: 'FLUX.1 dev model for testing'
+    maxResolution: '1440x1440'
+    typical_time: '10-20s'
   }
 }
 
@@ -83,7 +86,7 @@ export class FluxApiService {
       timeout: 120000, // 2 minutes timeout for image generation
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.flux.apiKey}`
+        'x-key': config.flux.apiKey
       }
     })
 
@@ -170,46 +173,48 @@ export class FluxApiService {
         return result
       }
 
+      const model = request.model || config.flux.defaultModel
       const payload = {
         prompt: request.prompt,
-        model: request.model || config.flux.defaultModel,
         width: request.width || 1024,
         height: request.height || 1024,
-        num_inference_steps: request.num_inference_steps || 50,
-        guidance_scale: request.guidance_scale || 7.5,
+        steps: request.num_inference_steps || 28,
+        guidance: request.guidance_scale || 3,
         seed: request.seed,
-        output_format: request.output_format || 'jpeg'
+        output_format: request.output_format || 'jpeg',
+        prompt_upsampling: false,
+        safety_tolerance: 2
       }
 
       logger.info('Generating image with Flux API', {
-        model: payload.model,
+        model: model,
         prompt: payload.prompt.substring(0, 100),
         dimensions: `${payload.width}x${payload.height}`,
         mode: 'REAL API'
       })
 
-      const response = await this.client.post('/v1/images/generations', payload)
+      // Use the model-specific endpoint for BFL API
+      const endpoint = `/v1/${model}`
+      const response = await this.client.post(endpoint, payload)
 
-      // Handle both synchronous and asynchronous responses
-      if (response.data.status === 'completed') {
-        logger.info('Image generation completed immediately', {
-          id: response.data.id,
-          imageCount: response.data.result?.images?.length || 0
-        })
-      } else if (response.data.status === 'pending' || response.data.status === 'processing') {
+      // BFL API returns a polling URL for asynchronous requests
+      if (response.data.id) {
         logger.info('Image generation started, polling for completion', {
-          id: response.data.id,
-          status: response.data.status
+          id: response.data.id
         })
 
-        // Poll for completion
+        // Poll for completion using the returned ID
         return await this.pollForCompletion(response.data.id)
       }
 
+      // If response contains direct result (unlikely with BFL), return it
       return response.data
     } catch (error) {
-      logger.error('Failed to generate image:', error)
-      throw new Error(`Image generation failed: ${error.response?.data?.message || error.message}`)
+      const errorMessage = error instanceof Error
+        ? `Image generation failed: ${(error as any).response?.data?.message || error.message}`
+        : 'Image generation failed'
+      logger.error('Failed to generate image:', { error: errorMessage })
+      throw new Error(errorMessage)
     }
   }
 
@@ -226,7 +231,7 @@ export class FluxApiService {
         if (config.flux.useMock) {
           result = await this.mockService.getGenerationStatus(generationId)
         } else {
-          const response = await this.client.get(`/v1/images/generations/${generationId}`)
+          const response = await this.client.get(`/v1/get_result?id=${generationId}`)
           result = response.data
         }
 
@@ -237,16 +242,34 @@ export class FluxApiService {
           mode: config.flux.useMock ? 'MOCK' : 'REAL'
         })
 
-        if (result.status === 'completed') {
+        if (result.status === 'Ready' || result.status === 'completed') {
           logger.info('Image generation completed', {
             id: generationId,
-            imageCount: result.result?.images?.length || 0,
+            imageUrl: result.result?.sample || result.result?.images?.[0]?.url || 'No URL',
             attempts: attempts + 1,
             mode: config.flux.useMock ? 'MOCK' : 'REAL'
           })
-          return result
-        } else if (result.status === 'failed') {
-          throw new Error(`Image generation failed: ${result.error?.message || 'Unknown error'}`)
+
+          // Convert BFL response format to our expected format
+          const convertedResult: FluxImageGenerationResponse = {
+            id: generationId,
+            status: 'completed',
+            result: {
+              images: [{
+                url: result.result?.sample || result.result?.images?.[0]?.url || '',
+                width: result.result?.width || result.result?.images?.[0]?.width || 1024,
+                height: result.result?.height || result.result?.images?.[0]?.height || 1024,
+                content_type: 'image/jpeg'
+              }]
+            },
+            created_at: result.created_at || new Date().toISOString(),
+            completed_at: new Date().toISOString()
+          }
+
+          return convertedResult
+        } else if (result.status === 'Error' || result.status === 'failed') {
+          const errorMsg = (result as any).error?.message || 'Unknown error'
+          throw new Error(`Image generation failed: ${errorMsg}`)
         }
 
         attempts++
@@ -254,8 +277,9 @@ export class FluxApiService {
         if (attempts >= maxAttempts - 1) {
           throw error
         }
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         logger.warn('Error polling for completion, retrying...', {
-          error: error.message,
+          error: errorMessage,
           attempt: attempts + 1
         })
         attempts++
@@ -271,23 +295,22 @@ export class FluxApiService {
         return await this.mockService.getModels()
       }
 
-      // For now, return static model information
-      // In a real implementation, this might call an API endpoint
+      // Return BFL static model information
       return {
-        'flux-1-pro': {
-          description: 'Highest quality, slower generation',
+        'flux-pro-1.1': {
+          description: 'Latest FLUX 1.1 pro model',
           maxResolution: '2048x2048',
           typical_time: '60-120s'
         },
-        'flux-1-dev': {
-          description: 'Balanced quality and speed',
-          maxResolution: '1024x1024',
-          typical_time: '15-30s'
+        'flux-pro': {
+          description: 'FLUX.1 pro model',
+          maxResolution: '2048x2048',
+          typical_time: '30-60s'
         },
-        'flux-1-schnell': {
-          description: 'Fastest generation, good quality',
-          maxResolution: '1024x1024',
-          typical_time: '5-10s'
+        'flux-dev': {
+          description: 'FLUX.1 dev model for testing',
+          maxResolution: '1440x1440',
+          typical_time: '10-20s'
         }
       }
     } catch (error) {
@@ -321,23 +344,86 @@ export class FluxApiService {
         }
       }
 
-      // For real API, we would implement different endpoints based on edit type
-      // For now, use a generic editing approach
-      const payload = {
-        image_url: request.imageUrl,
-        instruction: request.instruction,
-        edit_type: request.editType || 'enhance',
-        mask_data: request.maskData,
-        strength: request.strength || 0.7,
-        guidance_scale: request.guidance || 7.5,
-        model: request.model || config.flux.defaultModel,
-        output_format: request.output_format || 'jpeg'
+      // Use appropriate BFL API endpoint based on edit type
+      let endpoint: string
+      let payload: any
+
+      switch (request.editType) {
+        case 'inpaint':
+          // Use FLUX.1 Fill for inpainting with mask
+          endpoint = '/v1/flux-pro-1.0-fill'
+          payload = {
+            prompt: request.instruction,
+            image: request.imageUrl, // BFL expects base64 or URL
+            mask: request.maskData,
+            steps: 50,
+            guidance: request.guidance || 30,
+            output_format: request.output_format || 'jpeg',
+            safety_tolerance: 2
+          }
+          break
+
+        case 'outpaint':
+        case 'expand':
+          // Use expand endpoint for outpainting
+          endpoint = '/v1/flux-expand'
+          payload = {
+            image: request.imageUrl,
+            prompt: request.instruction,
+            top: 512, // Default expansion
+            bottom: 512,
+            left: 512,
+            right: 512,
+            steps: 50,
+            guidance: request.guidance || 50,
+            output_format: request.output_format || 'jpeg',
+            safety_tolerance: 2
+          }
+          break
+
+        default:
+          // Use Kontext Pro for general editing
+          endpoint = '/v1/flux-kontext-pro'
+          payload = {
+            prompt: request.instruction,
+            input_image: request.imageUrl,
+            seed: Math.floor(Math.random() * 1000000),
+            aspect_ratio: '1:1',
+            output_format: request.output_format || 'jpeg',
+            safety_tolerance: 2,
+            prompt_upsampling: false
+          }
       }
 
-      const response = await this.client.post('/v1/images/edit', payload)
+      const response = await this.client.post(endpoint, payload)
 
+      // BFL API returns a polling URL for asynchronous requests
+      if (response.data.id) {
+        logger.info('Image editing started, polling for completion', {
+          id: response.data.id,
+          editType: request.editType,
+          endpoint
+        })
+
+        // Poll for completion using the same mechanism as image generation
+        const result = await this.pollForCompletion(response.data.id)
+
+        // Convert polling result to editing response format
+        return {
+          success: result.status === 'completed',
+          imageUrl: result.result?.sample || result.result?.images?.[0]?.url,
+          size: result.result?.images?.[0]?.width && result.result?.images?.[0]?.height
+            ? result.result.images[0].width * result.result.images[0].height
+            : undefined,
+          editType: request.editType,
+          processingTime: Date.now() - startTime,
+          error: result.status === 'failed' ? result.error?.message : undefined
+        }
+      }
+
+      // Handle direct response (shouldn't happen with BFL API)
       if (response.data.success) {
-        logger.info('Image editing completed successfully', {
+        logger.info('Image editing completed immediately', {
           editType: request.editType,
           processingTime: Date.now() - startTime,
           mode: 'REAL API'
@@ -345,7 +431,7 @@ export class FluxApiService {
 
         return {
           success: true,
-          imageUrl: response.data.image_url,
+          imageUrl: response.data.image_url || response.data.result?.sample,
           size: response.data.size,
           editType: request.editType,
           processingTime: Date.now() - startTime
@@ -359,10 +445,13 @@ export class FluxApiService {
       }
 
     } catch (error) {
-      logger.error('Failed to edit image:', error)
+      const errorMessage = error instanceof Error
+        ? `Image editing failed: ${(error as any).response?.data?.message || error.message}`
+        : 'Image editing failed'
+      logger.error('Failed to edit image:', { error: errorMessage })
       return {
         success: false,
-        error: `Image editing failed: ${error.response?.data?.message || error.message}`,
+        error: errorMessage,
         processingTime: Date.now() - startTime
       }
     }
@@ -391,8 +480,8 @@ export class FluxApiService {
       model: config.flux.defaultModel,
       width: 1024,
       height: 1024,
-      num_inference_steps: 50,
-      guidance_scale: 7.5,
+      num_inference_steps: 28,
+      guidance_scale: 3,
       output_format: 'jpeg'
     }
   }

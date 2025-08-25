@@ -1,5 +1,11 @@
 import dotenv from 'dotenv'
 import { z } from 'zod'
+import {
+  DEFAULT_CHAT_CONFIG,
+  DEFAULT_INTENT_DETECTION_CONFIG,
+  DEFAULT_IMAGE_GENERATION_CONFIG,
+  DEFAULT_IMAGE_EDITING_CONFIG
+} from './services/index'
 
 dotenv.config()
 
@@ -22,8 +28,8 @@ const configSchema = z.object({
   }),
   flux: z.object({
     apiKey: z.string(),
-    baseUrl: z.string().default('https://api.fluxapi.ai'),
-    defaultModel: z.string().default('flux-1-dev'),
+    baseUrl: z.string().default('https://api.bfl.ai'),
+    defaultModel: z.string().default('flux-dev'),
     useMock: z.boolean().default(true) // Use mock by default to save API credits
   }),
   images: z.object({
@@ -41,6 +47,39 @@ const configSchema = z.object({
   }),
   session: z.object({
     timeoutMs: z.number().default(1800000)
+  }),
+  llm: z.object({
+    provider: z.string().default(DEFAULT_CHAT_CONFIG.provider),
+    defaultModel: z.string().default(DEFAULT_CHAT_CONFIG.modelName),
+    chat: z.object({
+      temperature: z.number().default(DEFAULT_CHAT_CONFIG.temperature),
+      maxTokens: z.number().default(DEFAULT_CHAT_CONFIG.maxTokens),
+      stream: z.boolean().default(DEFAULT_CHAT_CONFIG.stream)
+    }),
+    intentDetection: z.object({
+      temperature: z.number().default(DEFAULT_INTENT_DETECTION_CONFIG.temperature),
+      maxTokens: z.number().default(DEFAULT_INTENT_DETECTION_CONFIG.maxTokens),
+      stream: z.boolean().default(DEFAULT_INTENT_DETECTION_CONFIG.stream)
+    }),
+    imageGeneration: z.object({
+      promptEnhancement: z.object({
+        temperature: z.number().default(DEFAULT_IMAGE_GENERATION_CONFIG.promptEnhancement.temperature),
+        maxTokens: z.number().default(DEFAULT_IMAGE_GENERATION_CONFIG.promptEnhancement.maxTokens),
+        stream: z.boolean().default(DEFAULT_IMAGE_GENERATION_CONFIG.promptEnhancement.stream)
+      })
+    }),
+    imageEditing: z.object({
+      contextAnalysis: z.object({
+        temperature: z.number().default(DEFAULT_IMAGE_EDITING_CONFIG.contextAnalysis.temperature),
+        maxTokens: z.number().default(DEFAULT_IMAGE_EDITING_CONFIG.contextAnalysis.maxTokens),
+        stream: z.boolean().default(DEFAULT_IMAGE_EDITING_CONFIG.contextAnalysis.stream)
+      }),
+      instructionEnhancement: z.object({
+        temperature: z.number().default(DEFAULT_IMAGE_EDITING_CONFIG.instructionEnhancement.temperature),
+        maxTokens: z.number().default(DEFAULT_IMAGE_EDITING_CONFIG.instructionEnhancement.maxTokens),
+        stream: z.boolean().default(DEFAULT_IMAGE_EDITING_CONFIG.instructionEnhancement.stream)
+      })
+    })
   })
 })
 
@@ -65,8 +104,8 @@ const parseConfig = () => {
       },
       flux: {
         apiKey: process.env.FLUX_API_KEY || '',
-        baseUrl: process.env.FLUX_API_BASE_URL || 'https://api.fluxapi.ai',
-        defaultModel: process.env.FLUX_DEFAULT_MODEL || 'flux-1-dev',
+        baseUrl: process.env.FLUX_API_BASE_URL || 'https://api.bfl.ai',
+        defaultModel: process.env.FLUX_DEFAULT_MODEL || 'flux-dev',
         useMock: process.env.FLUX_USE_MOCK !== 'false' // Default to mock unless explicitly set to false
       },
       images: {
@@ -84,6 +123,39 @@ const parseConfig = () => {
       },
       session: {
         timeoutMs: Number(process.env.SESSION_TIMEOUT_MS) || 1800000
+      },
+      llm: {
+        provider: process.env.LLM_PROVIDER || 'openai',
+        defaultModel: process.env.LLM_DEFAULT_MODEL || 'gpt-4o-mini',
+        chat: {
+          temperature: Number(process.env.LLM_CHAT_TEMPERATURE) || 0.7,
+          maxTokens: Number(process.env.LLM_CHAT_MAX_TOKENS) || 500,
+          stream: process.env.LLM_CHAT_STREAM !== 'false'
+        },
+        intentDetection: {
+          temperature: Number(process.env.LLM_INTENT_TEMPERATURE) || 0.1,
+          maxTokens: Number(process.env.LLM_INTENT_MAX_TOKENS) || 150,
+          stream: process.env.LLM_INTENT_STREAM === 'true'
+        },
+        imageGeneration: {
+          promptEnhancement: {
+            temperature: Number(process.env.LLM_IMAGE_GEN_TEMPERATURE) || 0.8,
+            maxTokens: Number(process.env.LLM_IMAGE_GEN_MAX_TOKENS) || 300,
+            stream: process.env.LLM_IMAGE_GEN_STREAM === 'true'
+          }
+        },
+        imageEditing: {
+          contextAnalysis: {
+            temperature: Number(process.env.LLM_IMAGE_EDIT_CONTEXT_TEMPERATURE) || 0.3,
+            maxTokens: Number(process.env.LLM_IMAGE_EDIT_CONTEXT_MAX_TOKENS) || 400,
+            stream: process.env.LLM_IMAGE_EDIT_CONTEXT_STREAM === 'true'
+          },
+          instructionEnhancement: {
+            temperature: Number(process.env.LLM_IMAGE_EDIT_INSTRUCTION_TEMPERATURE) || 0.8,
+            maxTokens: Number(process.env.LLM_IMAGE_EDIT_INSTRUCTION_MAX_TOKENS) || 300,
+            stream: process.env.LLM_IMAGE_EDIT_INSTRUCTION_STREAM === 'true'
+          }
+        }
       }
     })
   } catch (error) {

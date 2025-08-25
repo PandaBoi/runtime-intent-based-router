@@ -24,10 +24,10 @@ export interface IntentDetectionGraphConfig {
 }
 
 export const DEFAULT_INTENT_CONFIG: IntentDetectionGraphConfig = {
-  provider: 'openai',
-  modelName: 'gpt-4o-mini',
-  temperature: 0.1, // Low temperature for consistent classification
-  maxTokens: 100
+  provider: config.llm.provider,
+  modelName: config.llm.defaultModel,
+  temperature: config.llm.intentDetection.temperature,
+  maxTokens: config.llm.intentDetection.maxTokens
 }
 
 export class IntentDetectionGraph {
@@ -53,12 +53,12 @@ export class IntentDetectionGraph {
       // Create the LLM node for intent classification
       this.llmNode = new RemoteLLMChatNode({
         id: 'intent_classifier_llm',
-        provider: 'openai',
-        modelName: 'gpt-4o-mini',
-        stream: false, // We want complete responses for classification
+        provider: this.config.provider,
+        modelName: this.config.modelName,
+        stream: config.llm.intentDetection.stream,
         textGenerationConfig: {
-          maxNewTokens: 150,
-          temperature: 0.1
+          maxNewTokens: this.config.maxTokens,
+          temperature: this.config.temperature
         }
       })
 

@@ -1,11 +1,18 @@
 import {
-    GraphBuilder,
-    GraphTypes,
-    RemoteLLMChatNode
+  GraphBuilder,
+  GraphTypes,
+  RemoteLLMChatNode
 } from '@inworld/runtime/graph'
 import 'dotenv/config'
 
-async function testMinimalGraph() {
+describe('Test Setup', () => {
+  test('should be configured correctly', () => {
+    expect(process.env.NODE_ENV).toBe('test')
+  })
+})
+
+describe('BasicGraphTest', () => {
+  test('should execute minimal graph', async () => {
   console.log('🧪 Testing Minimal RemoteLLMChatNode Graph')
   console.log('============================================')
 
@@ -133,29 +140,27 @@ async function testMinimalGraph() {
       success: responseReceived
     })
 
-    // Cleanup
-    graph.cleanupAllExecutions()
+    // Cleanup - ensure async operations complete
+    console.log('🧹 Starting cleanup...')
+    await graph.cleanupAllExecutions()
+    await new Promise(resolve => setTimeout(resolve, 100)) // Allow cleanup to complete
     graph.destroy()
     console.log('🧹 Cleanup complete')
 
     if (responseReceived) {
       console.log('🎉 SUCCESS: Graph execution working!')
+      expect(responseReceived).toBe(true)
     } else {
       console.log('❌ FAILURE: No response received from graph')
+      expect(responseReceived).toBe(true) // This will fail the test properly
     }
 
   } catch (error) {
     console.error('💥 Error during test:', {
-      message: error.message,
-      stack: error.stack
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     })
+    throw error // Re-throw so Jest knows the test failed
   }
-}
-
-// Run the test
-testMinimalGraph().then(() => {
-  console.log('Test complete')
-}).catch(err => {
-  console.error('Test failed:', err)
-  process.exit(1)
+  }, 30000) // 30 second timeout
 })

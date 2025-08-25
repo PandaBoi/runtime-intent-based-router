@@ -1,13 +1,13 @@
 import { v4 as uuidv4 } from 'uuid'
 import { IntentType } from '../types'
 import {
-    ContextReference,
-    ConversationTurn,
-    ImageMetadata,
-    SessionContextAnalyzer,
-    SessionManager,
-    SessionState,
-    SessionStats
+  ContextReference,
+  ConversationTurn,
+  ImageMetadata,
+  SessionContextAnalyzer,
+  SessionManager,
+  SessionState,
+  SessionStats
 } from '../types/session'
 import { logger } from '../utils/logger'
 
@@ -20,10 +20,11 @@ export class InMemorySessionManager implements SessionManager, SessionContextAna
   private readonly SESSION_TIMEOUT = 24 * 60 * 60 * 1000 // 24 hours
   private readonly MAX_CONVERSATION_HISTORY = 50
   private readonly MAX_ACTIVE_IMAGES = 10
+  private cleanupInterval: NodeJS.Timeout | null = null
 
   constructor() {
     // Clean up expired sessions every hour
-    setInterval(() => this.cleanupExpiredSessions(), 60 * 60 * 1000)
+    this.cleanupInterval = setInterval(() => this.cleanupExpiredSessions(), 60 * 60 * 1000)
   }
 
   async createSession(userId?: string): Promise<SessionState> {
@@ -222,7 +223,8 @@ export class InMemorySessionManager implements SessionManager, SessionContextAna
     const intentDistribution: Record<IntentType, number> = {
       [IntentType.CHAT]: 0,
       [IntentType.GENERATE_IMAGE]: 0,
-      [IntentType.EDIT_IMAGE]: 0
+      [IntentType.EDIT_IMAGE]: 0,
+      [IntentType.UNKNOWN]: 0
     }
 
     let totalResponseTime = 0
@@ -349,6 +351,16 @@ export class InMemorySessionManager implements SessionManager, SessionContextAna
     }
 
     return suggestions
+  }
+
+  /**
+   * Cleanup method for tests - clears the interval to prevent Jest hanging
+   */
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval)
+      this.cleanupInterval = null
+    }
   }
 }
 
