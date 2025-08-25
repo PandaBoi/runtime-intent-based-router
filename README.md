@@ -7,18 +7,16 @@ An intent-based routing chat application built with Inworld Runtime, featuring t
 The application uses a modular graph-based architecture that routes user requests through specialized graphs:
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ffffff', 'primaryTextColor':'#000000', 'primaryBorderColor':'#cccccc', 'lineColor':'#666666', 'secondaryColor':'#f8f9fa', 'tertiaryColor':'#ffffff', 'background':'#ffffff', 'mainBkg':'#ffffff', 'secondBkg':'#f8f9fa'}}}%%
 graph TD
-    A[User Input] --> B{Intent Detection Graph}
-    B --> C[System Prompt:<br/>Intent Classification]
-    C --> D[RemoteLLMChatNode<br/>OpenAI GPT-4o-mini<br/>Temperature: 0.1]
-    D --> E{Intent Classification}
+    A[User Input] --> B[Intent Detection Graph]
+    B --> D[RemoteLLMChatNode<br/>OpenAI GPT-4o-mini<br/>Temperature: 0.1]
 
-    E -->|CHAT| F[Chat Graph]
-    E -->|GENERATE_IMAGE| G[Image Generation Graph]
-    E -->|EDIT_IMAGE| H[Image Editing Graph]
+    D -->|CHAT| F[Chat Graph]
+    D -->|GENERATE_IMAGE| G[Image Generation Graph]
+    D -->|EDIT_IMAGE| H[Image Editing Graph]
 
-    F --> I[System Prompt:<br/>Helpful Assistant]
-    I --> J[RemoteLLMChatNode<br/>OpenAI GPT-4o-mini<br/>Temperature: 0.7<br/>Streaming: true]
+    F --> J[RemoteLLMChatNode<br/>OpenAI GPT-4o-mini<br/>Temperature: 0.7<br/>Streaming: true]
     J --> K[Chat Response]
 
     G --> L[Image Generation Service<br/>Black Forest Labs Flux API]
