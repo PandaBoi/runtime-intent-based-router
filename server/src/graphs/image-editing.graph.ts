@@ -3,8 +3,10 @@ import {
   GraphTypes,
   RemoteLLMChatNode
 } from '@inworld/runtime/graph'
+import { renderJinja } from '@inworld/runtime/primitives/llm'
 import crypto from 'crypto'
 import { config } from '../config'
+import { CONTEXT_ANALYSIS_AND_INSTRUCTION_ENHANCEMENT_TEMPLATE } from '../prompts/image-editing'
 import { fluxApiService } from '../services/flux-api.service'
 import { sessionManager } from '../services/session-manager.service'
 import { ImageMetadata } from '../types/session'
@@ -407,25 +409,15 @@ export class ImageEditingGraph {
         }
       }
 
-      const contextPrompt = `You are an expert image editing assistant. Analyze the editing instruction and enhance it for optimal results.
+      const conversationContext = conversationHistory.slice(-3).map(turn =>
+        `User: ${turn.userInput}\nAssistant: ${typeof turn.response === 'string' ? turn.response.substring(0, 100) : '[Image/Media]'}`
+      ).join('\n')
 
-Target Image: ${targetImage.description || targetImage.originalName}
-Original Instruction: "${instruction}"
-
-Recent conversation context:
-${conversationHistory.slice(-3).map(turn => `User: ${turn.userInput}\nAssistant: ${typeof turn.response === 'string' ? turn.response.substring(0, 100) : '[Image/Media]'}`).join('\n')}
-
-Tasks:
-1. Determine the edit type: inpaint, outpaint, enhance, style_transfer, or variant
-2. Enhance the instruction to be more specific and effective for image editing
-3. Provide clear, actionable editing guidance
-
-Respond with JSON:
-{
-  "editType": "inpaint|outpaint|enhance|style_transfer|variant",
-  "enhancedInstruction": "enhanced editing instruction",
-  "reasoning": "brief explanation of the enhancement"
-}`
+      const contextPrompt = await renderJinja(CONTEXT_ANALYSIS_AND_INSTRUCTION_ENHANCEMENT_TEMPLATE, {
+        targetImage: targetImage.description || targetImage.originalName,
+        instruction,
+        conversationContext
+      })
 
       const graphInput = {
         messages: [

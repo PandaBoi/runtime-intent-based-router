@@ -4,6 +4,7 @@ import {
   RemoteLLMChatNode
 } from '@inworld/runtime/graph'
 import { config } from '../config'
+import { DEFAULT_CHAT_SYSTEM_PROMPT } from '../prompts/chat'
 import { logger } from '../utils/logger'
 
 /**
@@ -25,7 +26,7 @@ export const DEFAULT_CHAT_CONFIG: ChatGraphConfig = {
   modelName: config.llm.defaultModel,
   temperature: config.llm.chat.temperature,
   maxTokens: config.llm.chat.maxTokens,
-  systemPrompt: `You are a helpful AI assistant. Provide clear, concise, and friendly responses to user questions and requests.`
+  systemPrompt: DEFAULT_CHAT_SYSTEM_PROMPT
 }
 
 export class ChatGraph {

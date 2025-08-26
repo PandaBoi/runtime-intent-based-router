@@ -4,6 +4,7 @@ import {
   RemoteLLMChatNode
 } from '@inworld/runtime/graph'
 import { config } from '../config'
+import { INTENT_DETECTION_PROMPT } from '../prompts/intent-detection'
 import {
   IntentDetectionError,
   IntentResult,
@@ -17,31 +18,7 @@ export class IntentDetectionService {
   private llmNode: RemoteLLMChatNode | null = null
   private isInitialized = false
 
-  private readonly INTENT_DETECTION_PROMPT = `You are an intelligent intent classifier for a chat application that routes user requests to different AI services.
 
-Available intents:
-1. CHAT - General conversation, questions, help requests
-2. GENERATE_IMAGE - Creating, generating, making, drawing new images or artwork
-3. EDIT_IMAGE - Modifying, editing, changing existing images
-
-Instructions:
-- Analyze the user input and classify it into one of the three intents
-- Respond with ONLY a JSON object in this exact format:
-- {"intent": "INTENT_NAME", "confidence": 0.95, "reasoning": "brief explanation"}
-- Confidence should be between 0.0 and 1.0
-- Be precise and consistent
-
-Examples:
-User: "Hello, how are you?"
-Response: {"intent": "CHAT", "confidence": 0.95, "reasoning": "greeting and conversation"}
-
-User: "Generate an image of a sunset"
-Response: {"intent": "GENERATE_IMAGE", "confidence": 0.98, "reasoning": "requesting image creation"}
-
-User: "Make this photo brighter"
-Response: {"intent": "EDIT_IMAGE", "confidence": 0.92, "reasoning": "requesting image modification"}
-
-Now classify this user input:`
 
   async initialize(): Promise<void> {
     try {
@@ -111,14 +88,14 @@ Now classify this user input:`
       }
 
       // Create the prompt with the user input
-      const fullPrompt = `${this.INTENT_DETECTION_PROMPT}\n\nUser: "${input}"\nResponse:`
+      const fullPrompt = `${INTENT_DETECTION_PROMPT}\n\nUser: "${input}"\nResponse:`
 
       // Create the graph input using the LLMChatRequest format
       const graphInput = {
         messages: [
           {
             role: 'system',
-            content: this.INTENT_DETECTION_PROMPT
+            content: INTENT_DETECTION_PROMPT
           },
           {
             role: 'user',
