@@ -1,9 +1,11 @@
 import { NextFunction, Request, Response, Router } from 'express'
+import { v4 as uuidv4 } from 'uuid'
 import { ChatService } from '../services/chat-service'
 import { imageEditingService } from '../services/image-editing.service'
 import { imageGenerationService } from '../services/image-generation.service'
+import { intentDetectionService } from '../services/intent-detection.service'
 import { sessionManager } from '../services/session-manager.service'
-import { IntentType } from '../types'
+import { ChatMessage, IntentType } from '../types'
 import { AppError } from '../utils/error-handler'
 import { logger } from '../utils/logger'
 
@@ -43,6 +45,138 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       skipIntentDetection,
       hasImageOptions: Object.keys(imageOptions).length > 0
     })
+
+        // Check for image generation/editing requests and use streaming response
+    if (!skipIntentDetection) {
+      const intentResult = await intentDetectionService.detectIntent(message)
+      if (intentResult.success && intentResult.data) {
+        const detectedIntent = intentResult.data.intent
+
+        // For image generation/editing, use streaming response
+        if (detectedIntent === IntentType.GENERATE_IMAGE || detectedIntent === IntentType.EDIT_IMAGE) {
+          const session = sessionId ? await sessionManager.getSession(sessionId) : null
+          const finalSessionId = session?.sessionId || (await sessionManager.createSession()).sessionId
+
+          // Set up streaming response
+          res.writeHead(200, {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Transfer-Encoding': 'chunked',
+            'X-Content-Type-Options': 'nosniff'
+          })
+
+          // Send acknowledgement first
+          const acknowledgementText = detectedIntent === IntentType.GENERATE_IMAGE
+            ? 'Generating image...'
+            : 'Editing image...'
+
+          const acknowledgementResponse = {
+            type: 'acknowledgement',
+            data: {
+              message: {
+                id: uuidv4(),
+                content: acknowledgementText,
+                timestamp: new Date(),
+                role: 'assistant',
+                sessionId: finalSessionId
+              },
+              sessionId: finalSessionId,
+              detectedIntent: detectedIntent
+            }
+          }
+
+          res.write(`data: ${JSON.stringify(acknowledgementResponse)}\n\n`)
+
+          // Process the actual request directly with the appropriate service
+          let responseMessage
+          if (detectedIntent === IntentType.GENERATE_IMAGE) {
+            const imageResult = await imageGenerationService.generateImage(message, finalSessionId, { quality: 'balanced' })
+            if (imageResult.success && imageResult.data?.imageMetadata) {
+              responseMessage = {
+                id: uuidv4(),
+                content: imageResult.data.imageMetadata.storageUrl,
+                timestamp: new Date(),
+                role: 'assistant' as const,
+                sessionId: finalSessionId
+              }
+            } else {
+              responseMessage = {
+                id: uuidv4(),
+                content: `Image generation failed: ${imageResult.error}`,
+                timestamp: new Date(),
+                role: 'assistant' as const,
+                sessionId: finalSessionId
+              }
+            }
+          } else if (detectedIntent === IntentType.EDIT_IMAGE) {
+            const editingResult = await imageEditingService.editImage({
+              editInstruction: message,
+              sessionId: finalSessionId
+            })
+            if (editingResult.success && editingResult.data) {
+              responseMessage = {
+                id: uuidv4(),
+                content: editingResult.data.editedImage.storageUrl,
+                timestamp: new Date(),
+                role: 'assistant' as const,
+                sessionId: finalSessionId
+              }
+            } else {
+              responseMessage = {
+                id: uuidv4(),
+                content: `Image editing failed: ${editingResult.error}`,
+                timestamp: new Date(),
+                role: 'assistant' as const,
+                sessionId: finalSessionId
+              }
+            }
+          } else {
+            // Fallback to chat service
+            responseMessage = await chatService.processMessage(message, finalSessionId, true)
+          }
+
+          const context = await chatService.getSessionContext(finalSessionId)
+
+          // Prepare suggestions
+          let suggestions: string[] | undefined = undefined
+          if (detectedIntent === IntentType.GENERATE_IMAGE) {
+            const suggestionsResult = await imageGenerationService.getImageGenerationSuggestions(responseMessage.sessionId)
+            if (suggestionsResult.success) {
+              suggestions = suggestionsResult.data
+            }
+          } else if (detectedIntent === IntentType.EDIT_IMAGE) {
+            suggestions = await imageEditingService.getEditingSuggestions(responseMessage.sessionId)
+          }
+
+          // Send final result
+          const finalResponse = {
+            type: 'result',
+            data: {
+              message: responseMessage,
+              sessionId: responseMessage.sessionId,
+              detectedIntent: detectedIntent,
+              context: {
+                conversationLength: context?.conversationLength || 0,
+                hasImages: context?.hasImages || false,
+                imageCount: context?.stats?.imageCount || 0,
+                activeImages: context?.stats?.imageCount || 0,
+                sessionDuration: context?.stats?.sessionDuration || 0
+              },
+              capabilities: {
+                imageGeneration: true,
+                imageEditing: true,
+                conversationHistory: true,
+                sessionPersistence: true
+              },
+              suggestions: suggestions
+            }
+          }
+
+          res.write(`data: ${JSON.stringify(finalResponse)}\n\n`)
+          res.end()
+          return
+        }
+      }
+    }
 
     // Process message through chat service (which handles intent routing)
     const responseMessage = await chatService.processMessage(message, sessionId, skipIntentDetection)

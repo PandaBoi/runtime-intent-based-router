@@ -83,10 +83,10 @@ class ChatApp {
             await this.createSession()
 
             this.updateConnectionStatus(true)
-            console.log('🎉 Chat app initialized successfully')
+            console.log('Chat app initialized successfully')
 
         } catch (error) {
-            console.error('❌ Failed to initialize app:', error)
+            console.error('Failed to initialize app:', error)
             this.updateConnectionStatus(false)
             this.showError('Failed to connect to server. Please refresh the page.')
         }
@@ -98,7 +98,7 @@ class ChatApp {
             throw new Error('Health check failed')
         }
         const data = await response.json()
-        console.log('✅ Health check passed:', data.message)
+        console.log('Health check passed:', data.message)
         return data
     }
 
@@ -119,13 +119,13 @@ class ChatApp {
             // If sessionId is undefined, we'll get it from the first message
             if (this.sessionId) {
                 this.updateSessionInfo(this.sessionId)
-                console.log('✅ Session created:', this.sessionId)
+                console.log('Session created:', this.sessionId)
             } else {
-                console.log('⚠️ Session ID undefined, will get from first message')
+                console.log('Session ID undefined, will get from first message')
             }
 
         } catch (error) {
-            console.error('❌ Failed to create session:', error)
+            console.error('Failed to create session:', error)
             throw error
         }
     }
@@ -162,40 +162,47 @@ class ChatApp {
                 throw new Error(`API request failed: ${response.status}`)
             }
 
-            const data = await response.json()
+            // Check if this is a streaming response
+            const contentType = response.headers.get('content-type')
+                        console.log('Response content-type:', contentType)
 
-            // Check if this is an image-related request from server response
-            const detectedIntent = data.data.detectedIntent
-            console.log('🎯 Detected intent:', detectedIntent)
-            const isImageRequest = detectedIntent === 'generate-image' || detectedIntent === 'edit-image' ||
-                                   detectedIntent === 'GENERATE_IMAGE' || detectedIntent === 'EDIT_IMAGE' ||
-                                   (typeof detectedIntent === 'string' && (detectedIntent.toLowerCase().includes('generate') || detectedIntent.toLowerCase().includes('edit')))
+            if (contentType && contentType.includes('text/plain')) {
+                console.log('Detected streaming response, handling...')
+                // Handle streaming response
+                await this.handleStreamingResponse(response)
+                // Exit early - streaming handler takes care of everything
+                return
+            } else {
+                console.log('Detected JSON response, handling...')
+                // Handle regular JSON response
+                const data = await response.json()
 
-            // Update session ID if we didn't have one
-            if (!this.sessionId && data.data.sessionId) {
-                this.sessionId = data.data.sessionId
-                this.updateSessionInfo(this.sessionId)
+                // Update session ID if we didn't have one
+                if (!this.sessionId && data.data.sessionId) {
+                    this.sessionId = data.data.sessionId
+                    this.updateSessionInfo(this.sessionId)
+                }
+
+                // Add assistant response
+                this.addAssistantMessage(data.data)
+
+                // Clean up - hide typing indicator and re-enable input
+                this.hideTypingIndicator()
+                this.setInputEnabled(true)
+
+                // Update stats
+                this.updateStats(data.data)
+
+                // Show quick actions if we have images
+                if (this.imageCount > 0) {
+                    this.showQuickActions()
+                }
+
+                console.log('Message sent successfully:', data)
             }
-
-            // Add assistant response (this will handle cleanup for image requests)
-            this.addAssistantMessage(data.data)
-
-            // Clean up - always hide typing indicator and re-enable input
-            this.hideTypingIndicator()
-            this.setInputEnabled(true)
-
-            // Update stats
-            this.updateStats(data.data)
-
-            // Show quick actions if we have images
-            if (this.imageCount > 0) {
-                this.showQuickActions()
-            }
-
-            console.log('✅ Message sent successfully:', data)
 
         } catch (error) {
-            console.error('❌ Failed to send message:', error)
+            console.error('Failed to send message:', error)
             this.hideTypingIndicator()
             this.setInputEnabled(true)
             this.addErrorMessage('Sorry, I encountered an error. Please try again.')
@@ -216,7 +223,7 @@ class ChatApp {
         const message = data.message
         const intent = data.detectedIntent
 
-        console.log('📨 Assistant message received:', {
+        console.log('Assistant message received:', {
             content: message.content.substring(0, 100),
             intent,
             fullData: data
@@ -224,10 +231,14 @@ class ChatApp {
 
         // Check if this is an image response (URL + optional suggestions)
         if (this.isImageResponse(message.content, intent)) {
-            console.log('✅ Detected as image response, rendering image')
-            this.handleImageResponse(message.content, intent)
+            console.log('Detected as image response, rendering image')
+            console.log('Raw suggestions from data:', data.suggestions)
+            // Pass suggestions from data.suggestions if available, otherwise extract from content
+            const suggestions = data.suggestions ? data.suggestions.join(' • ') : null
+            console.log('Formatted suggestions:', suggestions)
+            this.handleImageResponse(message.content, intent, suggestions)
         } else {
-            console.log('📝 Detected as text response, rendering text')
+            console.log('Detected as text response, rendering text')
             // Create regular message element
             const messageEl = this.createMessageElement('assistant', message.content, intent)
             this.appendMessage(messageEl)
@@ -252,21 +263,23 @@ class ChatApp {
                              intentStr.includes('editimage') ||
                              intentStr.includes('image')
 
-        console.log('🔍 Image detection:', { content: content.substring(0, 100), intent, hasImageUrl, isImageIntent })
+        console.log('Image detection:', { content: content.substring(0, 100), intent, hasImageUrl, isImageIntent })
 
         return hasImageUrl && isImageIntent
     }
 
-    handleImageResponse(content, intent) {
-        console.log('🖼️ Processing image response:', content)
+        handleImageResponse(content, intent, passedSuggestions = null) {
+        console.log('Processing image response:', content)
 
         // Split content by lines to get URL and suggestions
         const lines = content.split('\n').filter(line => line.trim())
         const imageUrl = lines[0].trim()
-        const suggestions = lines.slice(1).join(' ').trim()
 
-        console.log('✅ Extracted image URL:', imageUrl)
-        console.log('💡 Suggestions:', suggestions)
+        // Use passed suggestions if available, otherwise extract from content
+        const suggestions = passedSuggestions || lines.slice(1).join(' ').trim()
+
+        console.log('Extracted image URL:', imageUrl)
+        console.log('Suggestions:', suggestions)
 
         // Create message element with image
         const messageEl = this.createImageMessageElement(imageUrl, suggestions, intent)
@@ -422,12 +435,12 @@ class ChatApp {
     }
 
     showLoadingOverlay(show) {
-        console.log('🔄 Loading overlay called with:', show)
+        console.log('Loading overlay called with:', show)
         if (this.loadingOverlay) {
             this.loadingOverlay.style.display = show ? 'flex' : 'none'
-            console.log('🔄 Loading overlay display set to:', this.loadingOverlay.style.display)
+            console.log('Loading overlay display set to:', this.loadingOverlay.style.display)
         } else {
-            console.error('❌ Loading overlay element not found!')
+            console.error('Loading overlay element not found!')
         }
     }
 
@@ -627,6 +640,81 @@ class ChatApp {
 
             // Clear the file input
             this.imageUploadInput.value = ''
+        }
+    }
+
+    async handleStreamingResponse(response) {
+        try {
+            console.log('Handling streaming response...')
+
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                buffer += decoder.decode(value, { stream: true })
+
+                // Process complete lines
+                const lines = buffer.split('\n')
+                buffer = lines.pop() // Keep the incomplete line in buffer
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const jsonStr = line.slice(6) // Remove 'data: ' prefix
+                        if (jsonStr.trim()) {
+                            try {
+                                const data = JSON.parse(jsonStr)
+
+                                if (data.type === 'acknowledgement') {
+                                    console.log('Received acknowledgement:', data.data.message.content)
+
+                                    // Update session ID if we didn't have one
+                                    if (!this.sessionId && data.data.sessionId) {
+                                        this.sessionId = data.data.sessionId
+                                        this.updateSessionInfo(this.sessionId)
+                                    }
+
+                                    // Add acknowledgement message
+                                    this.addAssistantMessage(data.data)
+
+                                                                } else if (data.type === 'result') {
+                                    console.log('Received final result')
+                                    console.log('Result data:', data.data)
+                                    console.log('Suggestions in result:', data.data.suggestions)
+
+                                    // Add the final result
+                                    this.addAssistantMessage(data.data)
+
+                                    // Update stats
+                                    this.updateStats(data.data)
+
+                                    // Clean up
+                                    this.hideTypingIndicator()
+                                    this.setInputEnabled(true)
+
+                                    // Show quick actions if we have images
+                                    if (this.imageCount > 0) {
+                                        this.showQuickActions()
+                                    }
+                                }
+                            } catch (parseError) {
+                                console.error('Failed to parse streaming data:', parseError)
+                            }
+                        }
+                    }
+                }
+            }
+
+            console.log('Streaming response completed')
+
+        } catch (error) {
+            console.error('Failed to handle streaming response:', error)
+            this.hideTypingIndicator()
+            this.setInputEnabled(true)
+            this.addErrorMessage('Sorry, there was an error processing the response.')
         }
     }
 }
